@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#7ac943" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Crossy Way</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;500;600;700&family=Lilita+One&family=Press+Start+2P&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+  <div id="gameContainer"></div>
+  <div id="freezeFx"></div>
+  <div id="flash"></div>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud">
+    <div class="hud-left">
+      <div id="score">0</div>
+      <div class="best-box"><span class="trophy">🏆</span> TOP <span id="bestScore">0</span></div>
+      <div id="combo" class="combo hidden">
+        <div class="combo-row"><b id="comboMult">x1</b><span id="comboCount">0 hops</span></div>
+        <div class="combo-bar"><i id="comboBar"></i></div>
+      </div>
+      <div id="powerups"></div>
+    </div>
+    <div class="hud-right">
+      <div class="coin-box">
+        <span class="coin-icon"></span>
+        <span id="coins">0</span>
+      </div>
+      <div id="wxBadge" class="wx-badge">☀️</div>
+    </div>
+  </div>
+
+  <div id="pops"></div>
+  <div id="toast"></div>
+  <div id="warning" class="hidden">HURRY! 🦅</div>
+
+  <!-- in-run pause button (the welcome / game-over screens have their own menu buttons) -->
+  <div class="corner-buttons">
+    <button id="pauseBtn" title="Pause & settings (Esc)" aria-label="Pause">⏸</button>
+  </div>
+
+  <!-- ===== WELCOME ===== -->
+  <div id="startPanel" class="panel">
+    <div class="banner">
+      <div id="heroChick" class="hero-chick" aria-hidden="true"></div>
+      <h1 class="logo" aria-label="Crossy Way">
+        <span class="word">
+          <i style="--c:#ff5a5f;--cd:#c93a40;--i:0">C</i><i style="--c:#ff9f1c;--cd:#c56f00;--i:1">R</i><i
+            style="--c:#ffd23f;--cd:#cf9e00;--i:2">O</i><i style="--c:#5cb83f;--cd:#3a8a26;--i:3">S</i><i
+            style="--c:#2ec4b6;--cd:#1b8c82;--i:4">S</i><i style="--c:#3d8bff;--cd:#2160c9;--i:5">Y</i>
+        </span>
+        <span class="word w2">
+          <i style="--c:#c36bff;--cd:#8a3fc9;--i:6">W</i><i style="--c:#ff5a5f;--cd:#c93a40;--i:7">A</i><i
+            style="--c:#ffd23f;--cd:#cf9e00;--i:8">Y</i>
+        </span>
+      </h1>
+      <div class="ribbon"><span>HOP · DODGE · SURVIVE</span></div>
+    </div>
+
+    <button id="playBtn" class="play-btn"><span class="play-ico">▶</span> PLAY</button>
+    <div class="menu-row">
+      <button id="startShopBtn" class="menu-btn shop"><span class="mi">🛍️</span> SHOP</button>
+      <button id="startMissionsBtn" class="menu-btn missions"><span class="mi">🎯</span> MISSIONS<i id="missionDot"
+          class="dot"></i></button>
+      <button id="settingsBtn" class="menu-btn settings icon" title="Settings (Esc)" aria-label="Settings">⚙️</button>
+      <button id="fullscreenBtn" class="menu-btn full icon" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+    </div>
+    <p class="hint">or tap anywhere · press an arrow key</p>
+
+    <div class="stat-chips">
+      <div class="chip"><span class="ci">🏆</span><b id="startBest">0</b><small>TOP SCORE</small></div>
+      <div class="chip"><span class="ci">🪙</span><b id="startCoins">0</b><small>COINS</small></div>
+    </div>
+
+    <div class="pg">
+      <div class="pg-title">POWER-UPS</div>
+      <div class="pg-grid">
+        <div class="pg-item" style="--c:#ff5a5f"><span>🧲</span><b>Magnet</b><small>pulls coins</small></div>
+        <div class="pg-item" style="--c:#9ad7ff"><span>👻</span><b>Ghost</b><small>go through cars</small></div>
+        <div class="pg-item" style="--c:#3d8bff"><span>🛡️</span><b>Shield</b><small>one free hit</small></div>
+        <div class="pg-item" style="--c:#5fe3ff"><span>❄️</span><b>Freeze</b><small>stops traffic</small></div>
+        <div class="pg-item" style="--c:#ffc107"><span>💰</span><b>2x Coins</b><small>double pay</small></div>
+        <div class="pg-item" style="--c:#ff7a1a"><span>💣</span><b>Blast</b><small>clears the lane</small></div>
+      </div>
+    </div>
+    <p class="help">Arrows / WASD · Swipe or tap on touch · Esc pauses</p>
+  </div>
+
+  <!-- ===== GAME OVER ===== -->
+  <div id="gameOverPanel" class="panel hidden">
+    <div id="confetti"></div>
+    <div class="go-card">
+      <div class="go-ribbon"><span>GAME OVER</span></div>
+      <div id="newBest" class="new-best hidden"><span>🏆</span> NEW TOP SCORE! <span>🏆</span></div>
+      <p id="goCause" class="go-cause">Game over</p>
+      <div class="go-score">
+        <small>SCORE</small>
+        <b id="finalScore">0</b>
+      </div>
+      <div class="go-stats">
+        <div class="stat s-top"><span>🏆</span><b id="finalBest">0</b><small>TOP</small></div>
+        <div class="stat s-coin"><span>🪙</span><b>+<i id="finalCoins">0</i></b><small>COINS</small></div>
+      </div>
+      <div id="goMeta" class="go-meta"></div>
+      <div class="go-actions">
+        <button id="restartBtn"><span>▶</span> PLAY AGAIN</button>
+        <button id="shareBtn" class="share-btn">⤴ SHARE</button>
+      </div>
+      <div class="go-menu">
+        <button id="goShopBtn" class="menu-btn small shop">🛍️ SHOP</button>
+        <button id="goMissionsBtn" class="menu-btn small missions">🎯 MISSIONS</button>
+        <button id="goSettingsBtn" class="menu-btn small settings icon" title="Settings"
+          aria-label="Settings">⚙️</button>
+      </div>
+      <p class="go-help">Space or Enter to play again</p>
+    </div>
+  </div>
+
+  <!-- ===== SHOP ===== -->
+  <div id="shopPanel" class="panel modal hidden">
+    <div class="set-card shop-card">
+      <div class="card-head">
+        <h2>SHOP</h2>
+        <div class="coin-box small"><span class="coin-icon"></span><span id="shopCoins">0</span></div>
+      </div>
+      <div class="wardrobe">
+        <div id="shopPreview" class="wardrobe-chick"></div>
+        <div id="shopLook" class="wardrobe-name"></div>
+      </div>
+      <div class="tabs">
+        <button class="tab shop-tab active" data-tab="skin">🐔 Chickens</button>
+        <button class="tab shop-tab" data-tab="outfit">🎩 Outfits</button>
+      </div>
+      <div id="shopGrid" class="shop-grid"></div>
+      <p id="shopHint" class="shop-hint">Tap an item to buy or wear it.</p>
+      <button id="closeShopBtn" class="close-btn">◀ BACK</button>
+    </div>
+  </div>
+
+  <!-- ===== MISSIONS ===== -->
+  <div id="missionsPanel" class="panel modal hidden">
+    <div class="set-card mission-card">
+      <h2>MISSIONS</h2>
+      <div id="missionsBody"></div>
+      <button id="closeMissionsBtn" class="close-btn">◀ BACK</button>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS ===== -->
+  <div id="settingsPanel" class="panel modal settings-panel hidden">
+    <div class="set-card">
+      <h2>PAUSED</h2>
+      <div class="setting-group">
+        <div class="setting-label">Camera View</div>
+        <div class="option-row">
+          <button class="option-btn lean-btn" data-lean="left">◀ Lean Left</button>
+          <button class="option-btn lean-btn" data-lean="right">Lean Right ▶</button>
+        </div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-label">Time of Day</div>
+        <div class="option-row">
+          <button class="option-btn tod-btn" data-tod="auto">🔄 Auto</button>
+          <button class="option-btn tod-btn" data-tod="day">☀️ Day</button>
+          <button class="option-btn tod-btn" data-tod="night">🌙 Night</button>
+        </div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-label">Weather</div>
+        <div class="option-row">
+          <button class="option-btn wx-btn" data-wx="auto">🔄 Auto</button>
+          <button class="option-btn wx-btn" data-wx="clear">☀️ Clear</button>
+          <button class="option-btn wx-btn" data-wx="rain">🌧️ Rain</button>
+          <button class="option-btn wx-btn" data-wx="fog">🌫️ Fog</button>
+        </div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-label">Music <span id="musicPct" class="pct">50%</span></div>
+        <input id="musicSlider" class="slider" type="range" min="0" max="100" step="1" value="50"
+          aria-label="Music volume" />
+      </div>
+      <div class="setting-group">
+        <div class="setting-label">Sound Effects</div>
+        <div class="option-row">
+          <button class="option-btn sound-btn" data-sound="on">🔊 On</button>
+          <button class="option-btn sound-btn" data-sound="off">🔇 Off</button>
+        </div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-label">Graphics</div>
+        <div class="option-row">
+          <button class="option-btn quality-btn" data-quality="auto">Auto</button>
+          <button class="option-btn quality-btn" data-quality="low">Low</button>
+          <button class="option-btn quality-btn" data-quality="medium">Medium</button>
+          <button class="option-btn quality-btn" data-quality="high">High</button>
+        </div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-label">Title Font</div>
+        <div class="option-row">
+          <button class="option-btn font-btn" data-font="bold">Bold</button>
+          <button class="option-btn font-btn" data-font="fun">Fun</button>
+          <button class="option-btn font-btn" data-font="pixel">Pixel</button>
+          <button class="option-btn font-btn" data-font="classic">Classic</button>
+        </div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-label">On-screen D-pad</div>
+        <div class="option-row">
+          <button class="option-btn dpad-opt" data-dpad="off">Off</button>
+          <button class="option-btn dpad-opt" data-dpad="on">On</button>
+        </div>
+      </div>
+      <button id="closeSettingsBtn" class="close-btn">▶ RESUME</button>
+    </div>
+  </div>
+
+  <div id="dpad">
+    <button class="dpad-btn" data-dir="up" aria-label="Up">▲</button>
+    <div class="dpad-mid">
+      <button class="dpad-btn" data-dir="left" aria-label="Left">◀</button>
+      <button class="dpad-btn" data-dir="right" aria-label="Right">▶</button>
+    </div>
+    <button class="dpad-btn" data-dir="down" aria-label="Down">▼</button>
+  </div>
+
+  <script src="js/vendor/three.min.js"></script>
+  <script src="js/vendor/BufferGeometryUtils.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/cosmetics.js"></script>
+  <script src="js/missions.js"></script>
+  <script src="js/music.js"></script>
+  <script src="js/weather.js"></script>
+  <script src="js/textures.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/game.js"></script>
+</body>
+
+</html>
