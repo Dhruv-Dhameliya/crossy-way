@@ -234,6 +234,14 @@ var GameAudio = (function () {
       }
     },
 
+    // springy boing for a power-up leap ('over' = hop over an obstacle, 'double' = two tiles)
+    jump: function (kind) {
+      var big = kind === 'double';
+      tone(big ? 260 : 340, big ? 0.28 : 0.2, 'sine', 0.09, { freqEnd: big ? 900 : 620 });
+      tone(big ? 520 : 680, 0.18, 'triangle', 0.05, { freqEnd: big ? 1400 : 1000, delay: 0.03 });
+      noise(0.15, 0.06, { filter: 'bandpass', freq: 900, freqEnd: 2200, q: 0.9 });
+    },
+
     // ---- power-ups ----
     powerup: function () {
       [523, 659, 784, 1047].forEach(function (f, i) {

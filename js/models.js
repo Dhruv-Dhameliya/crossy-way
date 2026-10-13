@@ -150,7 +150,8 @@ var Models = (function () {
   ];
   // One random blocker for a tile (all of them stop the chicken like a tree does).
   function obstacleBoxes(out, x, z) {
-    switch (Utils.weightedChoice(OBSTACLE_ODDS)) {
+    var kind = Utils.weightedChoice(OBSTACLE_ODDS);
+    switch (kind) {
       case 'tree': treeBoxes(out, x, z, Utils.randInt(0, 3)); break;
       case 'rock': rockBoxes(out, x, z); break;
       case 'bush': bushBoxes(out, x, z); break;
@@ -162,7 +163,12 @@ var Models = (function () {
       case 'sunflower': sunflowerBoxes(out, x, z); break;
       default: mushroomBoxes(out, x, z);
     }
+    return kind;
   }
+
+  // Low obstacles the Jump power-up can hop over (trees, scarecrows and sunflowers are too tall).
+  var SMALL_KINDS = { rock: 1, bush: 1, hay: 1, fence: 1, stump: 1, barrels: 1, mushroom: 1 };
+  function isSmallObstacle(kind) { return !!SMALL_KINDS[kind]; }
 
   // Scenery material: like the shared voxel material, but everything above the
   // ground sways gently in the wind (tall trees and flowers more than low rocks).
@@ -585,6 +591,31 @@ var Models = (function () {
     return { group: g, red: red, green: green, mats: A };
   }
 
+  // A dashed light bar along the front edge of a railway: GREEN while the track is
+  // clear, flashing RED when a train is coming. It sits in the world and never moves,
+  // so the signal is readable wherever you are on the lane.
+  var _strip = null;
+  function stripAssets() {
+    if (_strip) return _strip;
+    var cv = document.createElement('canvas');
+    cv.width = 64; cv.height = 16;
+    var c = cv.getContext('2d');
+    c.fillStyle = '#ffffff';
+    c.fillRect(12, 2, 40, 12);
+    var tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.set(CONFIG.LANE_HALF * 2, 1);
+    function mat(col) { var m = new THREE.MeshBasicMaterial({ color: col, map: tex, transparent: true, alphaTest: 0.4 }); m.__shared = true; return m; }
+    var geo = new THREE.BoxGeometry(CONFIG.LANE_HALF * 2, 0.05, 0.16);
+    geo.__shared = true;
+    _strip = { geo: geo, green: mat(0x35ff6a), red: mat(0xff2a2a), dark: mat(0x3a1010) };
+    return _strip;
+  }
+  function buildSignalStrip() {
+    var A = stripAssets();
+    return { mesh: new THREE.Mesh(A.geo, A.green), mats: A };
+  }
+
   // ---------------------------------------------------------------------
   // Coin: spins around its vertical axis and bobs (animated by the world)
   // ---------------------------------------------------------------------
@@ -713,6 +744,8 @@ var Models = (function () {
   return {
     treeBoxes: treeBoxes,
     obstacleBoxes: obstacleBoxes,
+    isSmallObstacle: isSmallObstacle,
+    buildSignalStrip: buildSignalStrip,
     sceneryMaterial: sceneryMaterial,
     setWind: function (t) { _windU.value = t; },
     buildTurtles: buildTurtles,

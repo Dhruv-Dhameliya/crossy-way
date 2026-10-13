@@ -507,7 +507,7 @@
     });
     el.closeMissionsBtn.addEventListener('click', closeModal);
     [el.startShopBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.shopPanel, renderShop); }); });
-    [el.startMissionsBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.missionsPanel, renderMissions); }); });
+    [el.startMissionsBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.missionsPanel, openMissionsScreen); }); });
     el.shopTabs.forEach(function (t) {
       t.addEventListener('click', function () {
         shopTab = t.getAttribute('data-tab');
@@ -739,6 +739,7 @@
 
   function closeModal() {
     if (!modalEl) return;
+    if (modalEl === el.missionsPanel) finishMissionsScreen();
     endDpadPreview();
     modalEl.classList.add('hidden');
     modalEl = null;
@@ -826,26 +827,72 @@
   }
 
   // ---- missions --------------------------------------------------------------
-  function renderMissions() {
+  var missionTimers = [];
+  function clearMissionTimers() { missionTimers.forEach(clearTimeout); missionTimers = []; }
+  function later(fn, ms) { missionTimers.push(setTimeout(fn, ms)); }
+
+  function openMissionsScreen() {
+    renderMissions();
+    el.missionDot.classList.add('hidden'); // you're looking at it now
+  }
+
+  // If the screen is closed mid-animation, finish the job right away.
+  function finishMissionsScreen() {
+    clearMissionTimers();
+    Missions.collectCompleted();
+    updateMissionDot();
+  }
+
+  // enterIdx: slots that just received a brand-new mission (they slide in)
+  function renderMissions(enterIdx) {
     var v = Missions.view();
     var d = v.daily;
     var pct = function (p, t) { return Math.round(100 * p / t); };
+    var dailyFresh = d.done && !d.seen; // finished, not yet shown
     var html = '<div class="sec-title">DAILY CHALLENGE</div>' +
-      '<div class="daily-card' + (d.done ? ' done' : '') + '">' +
+      '<div class="daily-card' + (d.done && !dailyFresh ? ' done' : '') + (dailyFresh ? ' pending' : '') + '">' +
       '<div class="dc-top"><span>' + d.icon + ' TODAY</span><span class="streak">🔥 ' + v.streak + ' day' + (v.streak === 1 ? '' : 's') + '</span></div>' +
       '<div class="dc-text">' + d.text + '</div>' +
-      '<div class="dc-bottom"><div class="mbar"><i style="width:' + pct(d.progress, d.target) + '%"></i></div>' +
+      '<div class="dc-bottom"><div class="mbar"><i style="width:' + (dailyFresh ? 0 : pct(d.progress, d.target)) + '%"></i></div>' +
       '<span class="dc-count">' + (d.done ? '✓ DONE' : d.progress + ' / ' + d.target) + '</span>' +
       '<span class="mrew">+' + d.reward + ' 🪙</span></div>' +
       (d.done ? '<div class="mission-foot">Come back tomorrow to keep your streak going!</div>' : '') +
       '</div><div class="sec-title">MISSIONS</div>';
-    v.missions.forEach(function (m) {
-      html += '<div class="mrow"><span class="mi">' + m.icon + '</span><div class="mt"><div class="mtext">' + m.text + '</div>' +
-        '<div class="mbar"><i style="width:' + pct(m.progress, m.target) + '%"></i></div>' +
-        '<div class="mprog">' + m.progress + ' / ' + m.target + '</div></div><span class="mrew">+' + m.reward + ' 🪙</span></div>';
+    var anyDone = false;
+    v.missions.forEach(function (m, i) {
+      if (m.done) anyDone = true;
+      var cls = 'mrow' + (m.done ? ' completing' : '') + (enterIdx && enterIdx.indexOf(i) >= 0 ? ' enter' : '');
+      html += '<div class="' + cls + '"><span class="mi">' + m.icon + '</span><div class="mt"><div class="mtext">' + m.text + '</div>' +
+        '<div class="mbar"><i style="width:' + (m.done ? 0 : pct(m.progress, m.target)) + '%"></i></div>' +
+        '<div class="mprog">' + (m.done ? '✓ COMPLETE!' : m.progress + ' / ' + m.target) + '</div></div><span class="mrew">+' + m.reward + ' 🪙</span></div>';
     });
     html += '<div class="mission-foot">Missions completed: ' + v.completed + '</div>';
     el.missionsBody.innerHTML = html;
+
+    if (!anyDone && !dailyFresh) return;
+    // 1) the bar fills up  2) it turns green  3) the finished mission slides away  4) a new one arrives
+    var fills = el.missionsBody.querySelectorAll('.mrow.completing .mbar i, .daily-card.pending .mbar i');
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { for (var k = 0; k < fills.length; k++) fills[k].style.width = '100%'; });
+    });
+    later(function () {
+      var rows = el.missionsBody.querySelectorAll('.mrow.completing, .daily-card.pending');
+      for (var k = 0; k < rows.length; k++) rows[k].classList.add('green');
+      if (GameAudio) GameAudio.missionDone();
+    }, 900);
+    if (anyDone) {
+      later(function () {
+        var rows = el.missionsBody.querySelectorAll('.mrow.completing');
+        for (var k = 0; k < rows.length; k++) rows[k].classList.add('vanish');
+      }, 1700);
+      later(function () {
+        var replaced = Missions.collectCompleted();
+        renderMissions(replaced);
+        updateMissionDot();
+      }, 2300);
+    } else {
+      later(function () { Missions.collectCompleted(); updateMissionDot(); }, 1700);
+    }
   }
 
   function giveCoins(n) { setCoins(totalCoins + n); }
@@ -863,7 +910,7 @@
   }
 
   function updateMissionDot() {
-    el.missionDot.classList.toggle('hidden', !Missions.dailyPending());
+    el.missionDot.classList.toggle('hidden', !Missions.hasCompleted()); // only when something was completed
   }
 
   // ---- HUD, toasts, coins -------------------------------------------------
@@ -932,8 +979,7 @@
   }
 
   // A new row was reached.
-  function onNewRow() {
-    var z = player.maxZ;
+  function onNewRow(z) {
     idleTimer = 0;
     eagleCried = false;
 
@@ -1027,7 +1073,12 @@
       world.frozen = true;
       el.freezeFx.classList.add('on');
       if (GameAudio) GameAudio.freeze();
-    }
+    } else if (type === 'jump' || type === 'skiplane') refreshJump();
+  }
+
+  // Jump = hop over small obstacles; Skip Lane (the stronger one) = leap over a whole lane, two tiles at once.
+  function refreshJump() {
+    player.setJump(powers.skiplane ? 2 : powers.jump ? 1 : 0);
   }
 
   function endPower(type, silent) {
@@ -1041,6 +1092,7 @@
       world.frozen = false;
       el.freezeFx.classList.remove('on');
     } else if (type === 'magnet') world.magnet = null;
+    else if (type === 'jump' || type === 'skiplane') refreshJump();
     if (!silent && GameAudio) GameAudio.expire();
   }
 
@@ -1221,9 +1273,6 @@
     if (settingsOpen) return;
     var ls = world.listener;
     ls.x = player.x; ls.z = player.z; ls.ghost = !!powers.ghost;
-    var me = camera.matrixWorld.elements;
-    var vw = world.view || (world.view = {});
-    vw.x = camX; vw.z = camZ; vw.right = camera.right * 0.82; vw.rx = me[0]; vw.rz = me[2];
     world.update(dt, camZ, Math.round(player.z));
 
     Weather.update(dt, player.maxZ, camX, camZ, currentLevel());
@@ -1244,7 +1293,7 @@
     if (player.maxZ !== lastRow) {
       var prev = lastRow;
       lastRow = player.maxZ;
-      if (state === 'playing' && player.maxZ > prev) onNewRow();
+      if (state === 'playing') for (var nz = prev + 1; nz <= player.maxZ; nz++) onNewRow(nz);
     }
     updateComboHud(dt);
     checkIdle();

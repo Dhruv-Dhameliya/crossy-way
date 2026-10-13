@@ -49,6 +49,8 @@ Cars, taxis, police cars, vans, trucks and buses — plus **motorbikes, tractors
 | ❄️ | Freeze | Stops all traffic and trains for a few seconds |
 | 💰 | 2x Coins | Every coin counts double |
 | 💣 | Blast | Blows up the vehicles around you |
+| 🦘 | Jump | Hop over small obstacles — stumps, mushrooms, bushes, rocks, hay bales, fences, barrels |
+| ⏭️ | Skip Lane | Leap **over a whole lane** — two tiles at once, over anything: traffic, a river, a train track. Risky: you must land safely! |
 
 ## Shop 🛍️
 
@@ -57,7 +59,7 @@ Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, 
 ## Missions 🎯
 
 - **Daily Challenge** — a new goal every day, the same for everyone. Finish it to earn bonus coins and build a 🔥 streak for bigger rewards.
-- **Missions** — three rolling goals like "collect 30 coins" or "reach row 50". Complete one for coins and a fresh mission appears.
+- **Missions** — three rolling goals like "collect 30 coins" or "reach row 50". Finish one and a red dot appears on the Missions button. Open it to watch the bar fill, turn green and slide away, and a fresh mission takes its place.
 
 ## The world
 

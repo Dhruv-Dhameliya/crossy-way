@@ -14,7 +14,6 @@ function World(scene) {
   this.onMagnetCoin = null;
   this.listener = null;  // {x, z, ghost}: where the chicken is (for sounds and close calls)
   this.onNearMiss = null;
-  this.view = null;      // {x, z, right, rx, rz}: what the camera sees (the game updates it)
   this.hornCool = 0;
   this.amb = { traffic: 0 }; // 1 while the chicken's lane (or the next) is a road, drives the road hum
 }
@@ -114,7 +113,7 @@ World.prototype.generateRow = function (z) {
   ground.receiveShadow = true;
   group.add(ground);
 
-  var row = { z: z, type: type, top: top, group: group, blocked: {}, vehicles: [], logs: [], coins: [], items: [], train: null };
+  var row = { z: z, type: type, top: top, group: group, blocked: {}, small: {}, vehicles: [], logs: [], coins: [], items: [], train: null };
 
   var dir = band.dir || 1;
   if (type !== T.GRASS && type !== T.RAIL) band.dir = Math.random() < 0.85 ? -dir : dir;
@@ -158,8 +157,9 @@ World.prototype.populateGrass = function (row, z, p) {
       continue;
     }
     if (Math.random() < density) {
-      Models.obstacleBoxes(boxes, x, 0); // tree, rock, bush, hay bale, fence, scarecrow, stump, barrels, sunflower, mushroom
+      var kind = Models.obstacleBoxes(boxes, x, 0); // tree, rock, bush, hay bale, fence, scarecrow, stump, barrels, sunflower, mushroom
       row.blocked[x] = true;
+      if (Models.isSmallObstacle(kind)) row.small[x] = true; // the Jump power-up can hop over these
     } else if (Math.random() < 0.07) {
       Models.flowerBoxes(boxes, x, 0);
     }
@@ -496,7 +496,7 @@ World.prototype.populateRail = function (row) {
   ], { castShadow: false }));
 
   var sig = Models.buildSignal();
-  sig.group.position.set(-PH - 1.4, row.top, -0.5);
+  sig.group.position.set(-PH - 1.4, row.top, -0.5); // fixed in the world: signals never move
   var sig2 = Models.buildSignal();
   sig2.group.position.set(PH + 1.4, row.top, -0.5);
   row.group.add(sig.group);
@@ -511,6 +511,9 @@ World.prototype.populateRail = function (row) {
     warnPulse: 0,
     ding: -1
   };
+  row.train.strip = Models.buildSignalStrip();
+  row.train.strip.mesh.position.set(0, row.top + 0.03, -0.43);
+  row.group.add(row.train.strip.mesh);
   if (Math.random() < 0.16) this.placeCoin(row, false);
 };
 
@@ -521,20 +524,13 @@ World.prototype.setSignals = function (train, mode, blinkOn) {
     sg.green.forEach(function (m) { m.material = clear ? sg.mats.greenOn : sg.mats.greenOff; });
     sg.red.forEach(function (m) { m.material = !clear && blinkOn ? sg.mats.redOn : sg.mats.redOff; });
   });
+  if (train.strip) train.strip.mesh.material = clear ? train.strip.mats.green : (blinkOn ? train.strip.mats.red : train.strip.mats.dark);
 };
 
-// Keep the two signal posts near the left / right edges of what is on screen, so
-// you always see them (the playing field is wider than a phone screen).
-World.prototype.placeSignals = function (row) {
-  var v = this.view;
-  if (!v) return;
-  var dz = row.z - v.z;
-  var lim = CONFIG.PLAY_HALF + 1.4;
-  var xa = v.x + (v.right - v.rz * dz) / v.rx;
-  var xb = v.x + (-v.right - v.rz * dz) / v.rx;
-  var sg = row.train.signals;
-  sg[0].group.position.x = Utils.clamp(Math.min(xa, xb), -lim, lim);
-  sg[1].group.position.x = Utils.clamp(Math.max(xa, xb), -lim, lim);
+// A small, hoppable obstacle on this tile (Jump power-up)?
+World.prototype.isSmallObstacle = function (x, z) {
+  var row = this.rows.get(z);
+  return !!row && !!row.small[x];
 };
 
 World.prototype.spawnTrain = function (row) {
@@ -626,7 +622,6 @@ World.prototype.update = function (dt, centerZ, playerZ, budget) {
       }
     } else if (row.type === T.RAIL) {
       self.updateTrain(row, dt, vol);
-      self.placeSignals(row);
     }
   });
 

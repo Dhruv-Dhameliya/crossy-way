@@ -54,7 +54,7 @@ var Missions = (function () {
     var h = hash(date);
     var key = DAILY_KEYS[h % DAILY_KEYS.length];
     var tier = Math.floor(h / 7) % 5;
-    return { date: date, key: key, target: DAILY_TARGET[key][tier], progress: 0, done: false };
+    return { date: date, key: key, target: DAILY_TARGET[key][tier], progress: 0, done: false, seen: false };
   }
 
   function dailyReward(streakAfter) { return 60 + (Math.min(streakAfter, 5) - 1) * 10; }
@@ -79,11 +79,12 @@ var Missions = (function () {
     save();
   }
 
-  function finishMission(m, index) {
+  // A finished mission stays on the list (marked done) until the player opens the
+  // Missions screen, where it fills, turns green, vanishes and gets replaced.
+  function finishMission(m) {
     state.completed++;
-    var others = state.missions.map(function (x, i) { return i === index ? null : x.key; }).filter(Boolean);
-    others.push(m.key); // don't offer the same goal straight away
-    state.missions[index] = pickMission(others);
+    m.done = true;
+    m.progress = m.target;
     if (cb.onReward) cb.onReward(m.reward);
     if (cb.onComplete) cb.onComplete({ kind: 'mission', icon: TPL[m.key].icon, text: TPL[m.key].text(m.target), reward: m.reward });
     save();
@@ -92,6 +93,7 @@ var Missions = (function () {
   function finishDaily() {
     var d = state.daily;
     d.done = true;
+    d.seen = false;
     state.streak = state.lastDone === yesterday() ? state.streak + 1 : 1;
     state.lastDone = today();
     var reward = dailyReward(state.streak);
@@ -107,9 +109,9 @@ var Missions = (function () {
     run[stat] = value;
     for (var i = 0; i < state.missions.length; i++) {
       var m = state.missions[i];
-      if (m.key !== stat) continue;
+      if (m.key !== stat || m.done) continue;
       m.progress = TPL[stat].run ? Math.max(m.progress, value) : m.progress + (absolute ? 0 : amount);
-      if (m.progress >= m.target) finishMission(m, i);
+      if (m.progress >= m.target) finishMission(m);
     }
     var d = state.daily;
     if (d && !d.done && d.key === stat) {
@@ -122,10 +124,10 @@ var Missions = (function () {
     var d = state.daily;
     return {
       missions: state.missions.map(function (m) {
-        return { icon: TPL[m.key].icon, text: TPL[m.key].text(m.target), progress: Math.min(m.progress, m.target), target: m.target, reward: m.reward };
+        return { icon: TPL[m.key].icon, text: TPL[m.key].text(m.target), progress: Math.min(m.progress, m.target), target: m.target, reward: m.reward, done: !!m.done };
       }),
       daily: {
-        icon: '🏅', text: DAILY_TEXT[d.key](d.target), progress: Math.min(d.progress, d.target), target: d.target, done: d.done,
+        icon: '🏅', text: DAILY_TEXT[d.key](d.target), progress: Math.min(d.progress, d.target), target: d.target, done: d.done, seen: !!d.seen,
         reward: dailyReward(d.done ? Math.max(1, state.streak) : (state.lastDone === yesterday() ? state.streak + 1 : 1))
       },
       streak: streakNow(),
@@ -139,6 +141,24 @@ var Missions = (function () {
     runEnd: save,
     event: event,
     view: view,
-    dailyPending: function () { return !state.daily.done; }
+    // anything finished that the player has not looked at yet? (drives the red dot)
+    hasCompleted: function () {
+      return state.missions.some(function (m) { return m.done; }) || (state.daily.done && !state.daily.seen);
+    },
+    // Replace every finished mission with a fresh one; returns the slots that changed.
+    collectCompleted: function () {
+      var replaced = [];
+      for (var i = 0; i < state.missions.length; i++) {
+        var m = state.missions[i];
+        if (!m.done) continue;
+        var others = state.missions.map(function (x, j) { return j === i ? null : x.key; }).filter(Boolean);
+        others.push(m.key); // don't offer the same goal straight away
+        state.missions[i] = pickMission(others);
+        replaced.push(i);
+      }
+      if (state.daily.done) state.daily.seen = true;
+      save();
+      return replaced;
+    }
   };
 })();

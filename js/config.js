@@ -58,6 +58,8 @@ var CONFIG = {
     shield: { label: 'SHIELD', icon: '🛡️', color: '#3d8bff', dur: 16, weight: 0.2, blurb: 'Survives one hit' },
     freeze: { label: 'FREEZE', icon: '❄️', color: '#5fe3ff', dur: 6, weight: 0.13, blurb: 'Stops all traffic' },
     double: { label: '2X COINS', icon: '💰', color: '#ffc107', dur: 12, weight: 0.15, blurb: 'Coins count double' },
+    jump:   { label: 'JUMP', icon: '🦘', color: '#6dd34a', dur: 14, weight: 0.14, blurb: 'Hop over small obstacles' },
+    skiplane: { label: 'SKIP LANE', icon: '⏭️', color: '#ff9f1c', dur: 8, weight: 0.09, blurb: 'Leap over a whole lane at once' },
     blast:  { label: 'BLAST', icon: '💣', color: '#ff7a1a', dur: 0, weight: 0.17, blurb: 'Clears nearby traffic' }
   },
 

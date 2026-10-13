@@ -43,8 +43,23 @@ function Player(scene) {
   this.shadow.renderOrder = 1;
   this.scene.add(this.shadow);
   this.onLand = null;
+
+  // Glowing ring under the feet while a Jump power-up is active
+  var rg = new THREE.RingGeometry(0.3, 0.4, 24);
+  rg.rotateX(-Math.PI / 2);
+  this.jumpRing = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: 0x6dff8a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+  this.jumpRing.renderOrder = 2;
+  this.jumpRing.visible = false;
+  this.scene.add(this.jumpRing);
   this.reset();
 }
+
+// 0 = none, 1 = Jump (hop over small obstacles), 2 = Skip Lane (two tiles at once)
+Player.prototype.setJump = function (level) {
+  this.jumpLevel = level;
+  this.jumpRing.material.color.setHex(level >= 2 ? 0xffa530 : 0x6dff8a);
+  this.jumpRing.visible = level > 0 && this.alive && !this.dying;
+};
 
 // Ghost power-up: the chicken turns into a see-through, glowing ghost.
 Player.prototype.setGhost = function (on) {
@@ -173,6 +188,10 @@ Player.prototype.reset = function () {
   this.ghost = false;
   this.ghostLeft = 0;
   this.setShield(false);
+  this.jumpLevel = 0;
+  this.jumpRing.visible = false;
+  this.hopDur = CONFIG.HOP_DURATION;
+  this.hopH = CONFIG.HOP_HEIGHT;
   this.landT = 9;            // seconds since landing (drives the landing spring)
   this.fid = { type: null, t: 0, dur: 0, next: Utils.randRange(2.5, 5) };
   this.shadow.visible = true;
@@ -213,10 +232,24 @@ Player.prototype.tryStartHop = function (dx, dz, world) {
   var targetX = Math.round(startX) + dx; // forward/back hops snap to the grid
   var targetZ = startZ + dz;
 
-  if (world.isBlocked(targetX, targetZ) || targetZ < this.maxZ - CONFIG.MAX_BACKTRACK) {
+  // Jump power-ups: Skip Lane leaps two tiles over whatever is in between; Jump
+  // hops over a small obstacle (stump, mushroom, bush, rock, hay bale...) that would
+  // normally block the way. Either needs a free tile to land on.
+  var minZ = this.maxZ - CONFIG.MAX_BACKTRACK;
+  var farX = targetX + dx, farZ = targetZ + dz;
+  var farOk = !world.isBlocked(farX, farZ) && farZ >= minZ;
+  var leap = null;
+  if (this.jumpLevel >= 2 && farOk) leap = 'double';
+  else if (world.isBlocked(targetX, targetZ)) {
+    if (this.jumpLevel >= 1 && world.isSmallObstacle(targetX, targetZ) && farOk) leap = 'over';
+    else { this.bounce(dx, dz); return; }
+  } else if (targetZ < minZ) {
     this.bounce(dx, dz);
     return;
   }
+  if (leap) { targetX = farX; targetZ = farZ; }
+  this.hopDur = leap === 'double' ? 0.27 : leap === 'over' ? 0.22 : CONFIG.HOP_DURATION;
+  this.hopH = leap === 'double' ? 1.05 : leap === 'over' ? 0.85 : CONFIG.HOP_HEIGHT;
 
   this.face(dx, dz);
   this.hopping = true;
@@ -231,7 +264,7 @@ Player.prototype.tryStartHop = function (dx, dz, world) {
   this.fid.type = null;
   var r0 = world.getRow(Math.round(startZ));
   if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ);
-  if (GameAudio) GameAudio.hop();
+  if (GameAudio) { if (leap) GameAudio.jump(leap); else GameAudio.hop(); }
 };
 
 // Walked into a tree / the edge of the field: a little bump back.
@@ -281,11 +314,11 @@ Player.prototype.update = function (dt, world) {
   }
 
   if (this.hopping) {
-    this.hopT += dt / CONFIG.HOP_DURATION;
+    this.hopT += dt / this.hopDur;
     var t = Math.min(1, this.hopT);
     this.x = Utils.lerp(this.hopFrom.x, this.hopTo.x, t);
     this.z = Utils.lerp(this.hopFrom.z, this.hopTo.z, t);
-    this.air = Utils.hopArc(t) * CONFIG.HOP_HEIGHT;
+    this.air = Utils.hopArc(t) * this.hopH;
     this.y = Utils.lerp(this.hopFrom.y, this.hopTo.y, t) + this.air;
 
     // squash & stretch: crouch -> stretch in the air -> crouch on landing
@@ -398,6 +431,14 @@ Player.prototype.update = function (dt, world) {
   this.shadow.scale.setScalar(CONFIG.CHICKEN_SCALE * (1.15 - lift * 0.5));
   this.shadow.material.opacity = 0.3 * (1 - lift * 0.65);
 
+  var jr = this.jumpRing;
+  jr.visible = this.jumpLevel > 0;
+  if (jr.visible) {
+    jr.position.set(this.x + offsetX, this.y - this.air + 0.03, this.z + offsetZ);
+    jr.rotation.y += dt * 3;
+    jr.scale.setScalar(CONFIG.CHICKEN_SCALE * (1.25 + Math.sin(this.phase * 1.5) * 0.07 - lift * 0.3));
+  }
+
   if (!this.dying) this.checkHazards(world);
 };
 
@@ -458,6 +499,7 @@ Player.prototype.startDeath = function (type, world, hitBy) {
   if (this.dying || !this.alive || this.invincible) return;
   this.dying = true;
   this.shadow.visible = false;
+  this.jumpRing.visible = false;
   this.deathType = type;
   this.deathTimer = 0;
   this.hopping = false;

@@ -163,8 +163,12 @@ var Weather = (function () {
     if (cloudGroup.visible) {
       for (var ci = 0; ci < clouds.length; ci++) {
         var c = clouds[ci];
-        c.mesh.position.x = camX + wrap52(c.ox + cloudT * c.vx);
-        c.mesh.position.z = camZ + wrap52(c.oz + cloudT * c.vz);
+        // Each cloud has a fixed place in the WORLD and drifts at its own speed. The wrap
+        // only picks which copy of the (repeating) cloud field is nearest the camera, so
+        // moving around never drags the clouds along.
+        var wx = c.ox + cloudT * c.vx, wz = c.oz + cloudT * c.vz;
+        c.mesh.position.x = camX + wrap52(wx - camX);
+        c.mesh.position.z = camZ + wrap52(wz - camZ);
       }
     }
 
