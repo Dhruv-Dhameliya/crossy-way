@@ -754,3 +754,66 @@ body.modal-open .corner-buttons { display: none !important; }
 /* icon buttons keep their size in every title font */
 html[data-title-font="pixel"] .menu-btn.icon { font-size: 18px; }
 html[data-title-font="pixel"] .menu-btn.small.icon { font-size: 15px; }
+
+/* =====================================================================
+   v4: sectioned settings, split D-pad, pause button position
+   ===================================================================== */
+.set-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.set-tab {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 7px 2px 6px;
+  border: 3px solid #cfe3c2; border-radius: 14px;
+  background: #f4fbec; color: var(--ink);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.set-tab .ti { font-size: 20px; line-height: 1; }
+.set-tab.active { background: var(--green); border-color: var(--ink); color: #fff; box-shadow: 0 3px 0 var(--green-d); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); }
+.set-tab:active { transform: translateY(2px); }
+
+.set-sec { display: none; flex-direction: column; gap: 14px; min-height: 250px; }
+.set-sec.active { display: flex; animation: secIn 0.2s ease-out; }
+@keyframes secIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.setting-note { font-size: 12px; color: #6b8a5a; font-weight: 600; text-align: left; line-height: 1.35; }
+.swipe-btn, .dswap-btn { font-size: 13px; }
+
+/* in-run pause button: top centre (the bottom corners belong to the D-pad) */
+.corner-buttons { bottom: auto; top: calc(12px + var(--safe-t)); left: 50%; transform: translateX(-50%); }
+
+/* ---- D-pad ---- */
+#dpad {
+  position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+  width: auto; height: 0;
+  display: none; flex-direction: row; gap: 0;
+  pointer-events: none; z-index: 40;
+}
+#dpad.show { display: block; }
+body.modal-open #dpad { display: none !important; }
+#dpad .dp-group { position: fixed; bottom: calc(22px + var(--safe-b)); display: flex; gap: 14px; }
+#dpad .dpad-btn {
+  pointer-events: auto;
+  width: 60px; height: 60px; font-size: 22px;
+  opacity: 0.6; transition: opacity 0.1s;
+}
+#dpad .dpad-btn:active { opacity: 1; background: rgba(255, 255, 255, 0.45); }
+
+/* touch screens: Up/Down pair on one side, Left/Right pair on the other, bigger buttons */
+body.touch #dpad .dpad-btn {
+  width: clamp(72px, 19vw, 90px); height: clamp(72px, 19vw, 90px);
+  font-size: clamp(26px, 7vw, 34px); border-radius: 24px;
+}
+body.touch #dpad .dp-ud { flex-direction: column; left: calc(18px + var(--safe-l)); right: auto; }
+body.touch #dpad .dp-lr { flex-direction: row; right: calc(18px + var(--safe-r)); left: auto; }
+body.touch.dpad-swap #dpad .dp-ud { left: auto; right: calc(18px + var(--safe-r)); }
+body.touch.dpad-swap #dpad .dp-lr { right: auto; left: calc(18px + var(--safe-l)); }
+
+/* mouse / keyboard machines: the classic cross */
+body.no-touch #dpad.show {
+  display: grid; left: auto; right: 24px; bottom: 24px; top: auto;
+  width: max-content; height: auto; gap: 6px;
+  grid-template-areas: ". u ." "l . r" ". d .";
+}
+body.no-touch #dpad .dp-group { display: contents; }
+body.no-touch #dpad [data-dir="up"] { grid-area: u; }
+body.no-touch #dpad [data-dir="left"] { grid-area: l; }
+body.no-touch #dpad [data-dir="right"] { grid-area: r; }
+body.no-touch #dpad [data-dir="down"] { grid-area: d; }

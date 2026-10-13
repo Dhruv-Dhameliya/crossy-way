@@ -81,7 +81,7 @@
       <button id="settingsBtn" class="menu-btn settings icon" title="Settings (Esc)" aria-label="Settings">⚙️</button>
       <button id="fullscreenBtn" class="menu-btn full icon" title="Fullscreen" aria-label="Fullscreen">⛶</button>
     </div>
-    <p class="hint">or tap anywhere · press an arrow key</p>
+    <p id="startHint" class="hint">or tap anywhere · press an arrow key</p>
 
     <div class="stat-chips">
       <div class="chip"><span class="ci">🏆</span><b id="startBest">0</b><small>TOP SCORE</small></div>
@@ -166,78 +166,122 @@
   <div id="settingsPanel" class="panel modal settings-panel hidden">
     <div class="set-card">
       <h2>PAUSED</h2>
-      <div class="setting-group">
-        <div class="setting-label">Camera View</div>
-        <div class="option-row">
-          <button class="option-btn lean-btn" data-lean="left">◀ Lean Left</button>
-          <button class="option-btn lean-btn" data-lean="right">Lean Right ▶</button>
+
+      <div class="set-tabs" role="tablist">
+        <button class="set-tab active" data-sec="controls"><span class="ti">🎮</span><span class="tl">Controls</span></button>
+        <button class="set-tab" data-sec="world"><span class="ti">🌦️</span><span class="tl">World</span></button>
+        <button class="set-tab" data-sec="audio"><span class="ti">🔊</span><span class="tl">Audio</span></button>
+        <button class="set-tab" data-sec="display"><span class="ti">🖥️</span><span class="tl">Display</span></button>
+      </div>
+
+      <!-- CONTROLS -->
+      <div class="set-sec active" data-sec="controls">
+        <div class="setting-group">
+          <div class="setting-label">Camera View</div>
+          <div class="option-row">
+            <button class="option-btn lean-btn" data-lean="left">◀ Lean Left</button>
+            <button class="option-btn lean-btn" data-lean="right">Lean Right ▶</button>
+          </div>
+        </div>
+        <div class="setting-group">
+          <div class="setting-label">Touch Swipes</div>
+          <div class="option-row">
+            <button class="option-btn swipe-btn" data-swipe="cam">🧭 Follow camera</button>
+            <button class="option-btn swipe-btn" data-swipe="classic">⬆ Classic</button>
+          </div>
+          <p class="setting-note">Follow camera: swipe along the lanes you see. Diagonal swipes match the angle of the world.</p>
+        </div>
+        <div class="setting-group">
+          <div class="setting-label">On-screen D-pad</div>
+          <div class="option-row">
+            <button class="option-btn dpad-opt" data-dpad="off">Off</button>
+            <button class="option-btn dpad-opt" data-dpad="on">On</button>
+          </div>
+          <p class="setting-note">With the D-pad on, taps and swipes on the screen are turned off.</p>
+        </div>
+        <div class="setting-group">
+          <div class="setting-label">D-pad Layout (touch screens)</div>
+          <div class="option-row">
+            <button class="option-btn dswap-btn" data-dswap="off">▲▼ Left · ◀▶ Right</button>
+            <button class="option-btn dswap-btn" data-dswap="on">◀▶ Left · ▲▼ Right</button>
+          </div>
         </div>
       </div>
-      <div class="setting-group">
-        <div class="setting-label">Time of Day</div>
-        <div class="option-row">
-          <button class="option-btn tod-btn" data-tod="auto">🔄 Auto</button>
-          <button class="option-btn tod-btn" data-tod="day">☀️ Day</button>
-          <button class="option-btn tod-btn" data-tod="night">🌙 Night</button>
+
+      <!-- WORLD -->
+      <div class="set-sec" data-sec="world">
+        <div class="setting-group">
+          <div class="setting-label">Time of Day</div>
+          <div class="option-row">
+            <button class="option-btn tod-btn" data-tod="auto">🔄 Auto</button>
+            <button class="option-btn tod-btn" data-tod="day">☀️ Day</button>
+            <button class="option-btn tod-btn" data-tod="night">🌙 Night</button>
+          </div>
+        </div>
+        <div class="setting-group">
+          <div class="setting-label">Weather</div>
+          <div class="option-row">
+            <button class="option-btn wx-btn" data-wx="auto">🔄 Auto</button>
+            <button class="option-btn wx-btn" data-wx="clear">☀️ Clear</button>
+            <button class="option-btn wx-btn" data-wx="rain">🌧️ Rain</button>
+            <button class="option-btn wx-btn" data-wx="fog">🌫️ Fog</button>
+          </div>
+          <p class="setting-note">Auto changes the time of day and the weather as you run.</p>
         </div>
       </div>
-      <div class="setting-group">
-        <div class="setting-label">Weather</div>
-        <div class="option-row">
-          <button class="option-btn wx-btn" data-wx="auto">🔄 Auto</button>
-          <button class="option-btn wx-btn" data-wx="clear">☀️ Clear</button>
-          <button class="option-btn wx-btn" data-wx="rain">🌧️ Rain</button>
-          <button class="option-btn wx-btn" data-wx="fog">🌫️ Fog</button>
+
+      <!-- AUDIO -->
+      <div class="set-sec" data-sec="audio">
+        <div class="setting-group">
+          <div class="setting-label">Music <span id="musicPct" class="pct">50%</span></div>
+          <input id="musicSlider" class="slider" type="range" min="0" max="100" step="1" value="50" aria-label="Music volume" />
+        </div>
+        <div class="setting-group">
+          <div class="setting-label">Sound Effects</div>
+          <div class="option-row">
+            <button class="option-btn sound-btn" data-sound="on">🔊 On</button>
+            <button class="option-btn sound-btn" data-sound="off">🔇 Off</button>
+          </div>
         </div>
       </div>
-      <div class="setting-group">
-        <div class="setting-label">Music <span id="musicPct" class="pct">50%</span></div>
-        <input id="musicSlider" class="slider" type="range" min="0" max="100" step="1" value="50"
-          aria-label="Music volume" />
-      </div>
-      <div class="setting-group">
-        <div class="setting-label">Sound Effects</div>
-        <div class="option-row">
-          <button class="option-btn sound-btn" data-sound="on">🔊 On</button>
-          <button class="option-btn sound-btn" data-sound="off">🔇 Off</button>
+
+      <!-- DISPLAY -->
+      <div class="set-sec" data-sec="display">
+        <div class="setting-group">
+          <div class="setting-label">Graphics</div>
+          <div class="option-row">
+            <button class="option-btn quality-btn" data-quality="auto">Auto</button>
+            <button class="option-btn quality-btn" data-quality="low">Low</button>
+            <button class="option-btn quality-btn" data-quality="medium">Medium</button>
+            <button class="option-btn quality-btn" data-quality="high">High</button>
+          </div>
+          <p class="setting-note">Auto lowers the detail if your device struggles to keep up.</p>
+        </div>
+        <div class="setting-group">
+          <div class="setting-label">Title Font</div>
+          <div class="option-row">
+            <button class="option-btn font-btn" data-font="bold">Bold</button>
+            <button class="option-btn font-btn" data-font="fun">Fun</button>
+            <button class="option-btn font-btn" data-font="pixel">Pixel</button>
+            <button class="option-btn font-btn" data-font="classic">Classic</button>
+          </div>
         </div>
       </div>
-      <div class="setting-group">
-        <div class="setting-label">Graphics</div>
-        <div class="option-row">
-          <button class="option-btn quality-btn" data-quality="auto">Auto</button>
-          <button class="option-btn quality-btn" data-quality="low">Low</button>
-          <button class="option-btn quality-btn" data-quality="medium">Medium</button>
-          <button class="option-btn quality-btn" data-quality="high">High</button>
-        </div>
-      </div>
-      <div class="setting-group">
-        <div class="setting-label">Title Font</div>
-        <div class="option-row">
-          <button class="option-btn font-btn" data-font="bold">Bold</button>
-          <button class="option-btn font-btn" data-font="fun">Fun</button>
-          <button class="option-btn font-btn" data-font="pixel">Pixel</button>
-          <button class="option-btn font-btn" data-font="classic">Classic</button>
-        </div>
-      </div>
-      <div class="setting-group">
-        <div class="setting-label">On-screen D-pad</div>
-        <div class="option-row">
-          <button class="option-btn dpad-opt" data-dpad="off">Off</button>
-          <button class="option-btn dpad-opt" data-dpad="on">On</button>
-        </div>
-      </div>
+
       <button id="closeSettingsBtn" class="close-btn">▶ RESUME</button>
     </div>
   </div>
 
+  <!-- on-screen D-pad: two clusters on touch screens (swap them in Settings), a cross on desktop -->
   <div id="dpad">
-    <button class="dpad-btn" data-dir="up" aria-label="Up">▲</button>
-    <div class="dpad-mid">
+    <div class="dp-group dp-ud">
+      <button class="dpad-btn" data-dir="up" aria-label="Up">▲</button>
+      <button class="dpad-btn" data-dir="down" aria-label="Down">▼</button>
+    </div>
+    <div class="dp-group dp-lr">
       <button class="dpad-btn" data-dir="left" aria-label="Left">◀</button>
       <button class="dpad-btn" data-dir="right" aria-label="Right">▶</button>
     </div>
-    <button class="dpad-btn" data-dir="down" aria-label="Down">▼</button>
   </div>
 
   <script src="js/vendor/three.min.js"></script>

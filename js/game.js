@@ -36,6 +36,8 @@
   var lastHurryNum = -1;
   var lastComboCount = -1;
   var wxTimer = 0;
+  var swipeStyle = localStorage.getItem(CONFIG.SWIPE_KEY) || 'cam'; // 'cam' = follow the camera, 'classic'
+  var dpadOn = false;
 
   var IS_TOUCH = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
@@ -43,7 +45,7 @@
   ['score', 'coins', 'bestScore', 'powerups', 'toast', 'flash', 'freezeFx', 'startPanel', 'startBest', 'startCoins',
     'playBtn', 'gameOverPanel', 'goCause', 'goMeta', 'finalScore', 'finalBest', 'finalCoins', 'newBest', 'confetti',
     'restartBtn', 'shareBtn', 'warning', 'fullscreenBtn', 'settingsBtn', 'pauseBtn', 'goSettingsBtn', 'settingsPanel', 'closeSettingsBtn', 'dpad',
-    'combo', 'comboMult', 'comboCount', 'comboBar', 'pops', 'wxBadge', 'heroChick',
+    'startHint', 'combo', 'comboMult', 'comboCount', 'comboBar', 'pops', 'wxBadge', 'heroChick',
     'startShopBtn', 'startMissionsBtn', 'missionDot', 'goShopBtn', 'goMissionsBtn',
     'shopPanel', 'shopCoins', 'shopPreview', 'shopLook', 'shopGrid', 'shopHint', 'closeShopBtn',
     'missionsPanel', 'missionsBody', 'closeMissionsBtn', 'musicSlider', 'musicPct']
@@ -57,6 +59,10 @@
   el.shopTabs = document.querySelectorAll('.shop-tab');
   el.dpadButtons = document.querySelectorAll('.dpad-btn');
   el.dpadOptButtons = document.querySelectorAll('.dpad-opt');
+  el.dswapButtons = document.querySelectorAll('.dswap-btn');
+  el.swipeButtons = document.querySelectorAll('.swipe-btn');
+  el.setTabs = document.querySelectorAll('.set-tab');
+  el.setSecs = document.querySelectorAll('.set-sec');
 
   function vibrate(ms) {
     if (navigator.vibrate && GameAudio.isEnabled()) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } }
@@ -242,6 +248,9 @@
     applyTitleFont(localStorage.getItem(CONFIG.FONT_KEY) || 'bold');
     applySound((localStorage.getItem(CONFIG.SOUND_KEY) || 'on') !== 'off');
     applyDpad(localStorage.getItem(CONFIG.DPAD_KEY) === 'on');
+    applyDpadSwap(localStorage.getItem(CONFIG.DPAD_SWAP_KEY) === 'on');
+    applySwipe(swipeStyle);
+    showSection(localStorage.getItem(CONFIG.TAB_KEY) || 'controls');
     applyTod(Weather.timeMode());
     applyWx(Weather.weatherMode());
     setMusicUi(Music.getVolume());
@@ -249,7 +258,7 @@
       el.fullscreenBtn.classList.add('hidden');
     }
     if (!(navigator.share || (navigator.clipboard && navigator.clipboard.writeText))) el.shareBtn.classList.add('hidden');
-    if (!IS_TOUCH) document.body.classList.add('no-touch');
+    document.body.classList.add(IS_TOUCH ? 'touch' : 'no-touch');
 
     el.heroChick.innerHTML = Cosmetics.svg();
     refreshHud();
@@ -314,10 +323,29 @@
 
     backdrop.position.x = camX;
     backdrop.position.z = camZ;
-    // the sun sits on the opposite side from the camera so the faces you see are shaded
+    updateSun();
+  }
+
+  var sunOff = new THREE.Vector3(), sunDir = new THREE.Vector3(), sunR = new THREE.Vector3();
+  var sunU = new THREE.Vector3(), sunT = new THREE.Vector3(), Y_UP = new THREE.Vector3(0, 1, 0);
+
+  // The sun sits on the opposite side from the camera so the faces you see are
+  // shaded. It follows the camera, but in whole shadow-map pixels - otherwise
+  // the shadows slowly crawl across the ground while you move.
+  function updateSun() {
     var side = CONFIG.CAMERA_OFFSET.x > 0 ? -1 : 1;
-    sunLight.position.set(camX + side * 9, 20, camZ - 11);
-    sunLight.target.position.set(camX, 0, camZ + 1);
+    sunOff.set(side * 9, 20, -11);
+    sunDir.copy(sunOff).normalize();
+    sunR.crossVectors(Y_UP, sunDir).normalize();   // the shadow camera's own axes
+    sunU.crossVectors(sunDir, sunR);
+    sunT.set(camX, 0, camZ + 1);
+    var sc = sunLight.shadow.camera;
+    var texel = (sc.right - sc.left) / sunLight.shadow.mapSize.x;
+    var a = sunT.dot(sunR), b = sunT.dot(sunU);
+    sunT.addScaledVector(sunR, Math.round(a / texel) * texel - a);
+    sunT.addScaledVector(sunU, Math.round(b / texel) * texel - b);
+    sunLight.target.position.copy(sunT);
+    sunLight.position.copy(sunT).add(sunOff);
   }
 
   // How low the chicken sits on screen: -1 is the bottom edge.
@@ -342,6 +370,41 @@
     if (state === 'gameover' || settingsOpen) return;
     startGameIfNeeded();
     player.requestMove(dx * CONFIG.INPUT_X_SIGN, dz, world);
+  }
+
+  // A move in WORLD terms (used by camera-aware swipes).
+  function attemptWorldMove(wx, wz) {
+    unlockAudio();
+    if (state === 'gameover' || settingsOpen) return;
+    startGameIfNeeded();
+    player.requestMove(wx, wz, world);
+  }
+
+  var WORLD_MOVES = [[0, 1], [0, -1], [1, 0], [-1, 0]]; // forward, back, +x, -x
+
+  // Swipes. In "follow camera" mode the four hops lie along the diagonals you
+  // actually SEE (the world is rotated), and that depends on whether the camera
+  // leans left or right. Near-vertical / near-horizontal swipes stay simple:
+  // up/down = forward/back, left/right = sidestep.
+  function swipeMove(dx, dy) {
+    var ax = Math.abs(dx), ay = Math.abs(dy);
+    if (swipeStyle === 'classic') {
+      if (ax > ay) attemptMove(dx > 0 ? 1 : -1, 0);
+      else attemptMove(0, dy < 0 ? 1 : -1);
+      return;
+    }
+    var ang = Math.abs(Math.atan2(-dy, dx) * 180 / Math.PI); // 0 = right, 90 = up/down axis, 180 = left
+    if (Math.abs(ang - 90) < 16) { attemptMove(0, dy < 0 ? 1 : -1); return; }
+    if (ang < 16 || ang > 164) { attemptMove(dx > 0 ? 1 : -1, 0); return; }
+    var e = camera.matrixWorld.elements; // screen right = col 0, screen up = col 1
+    var best = null, bestScore = -2, len = Math.sqrt(dx * dx + dy * dy);
+    WORLD_MOVES.forEach(function (m) {
+      var vx = e[0] * m[0] + e[2] * m[1];
+      var vy = -(e[4] * m[0] + e[6] * m[1]); // pixel space: y grows downward
+      var sc = (dx * vx + dy * vy) / (Math.sqrt(vx * vx + vy * vy) * len);
+      if (sc > bestScore) { bestScore = sc; best = m; }
+    });
+    attemptWorldMove(best[0], best[1]);
   }
 
   function setupInput() {
@@ -389,6 +452,7 @@
       if (!e.isPrimary) return;
       unlockAudio();
       if (e.target.closest && e.target.closest('button, .modal, .go-card')) { press = null; return; }
+      if (dpadOn) { press = null; return; } // D-pad mode: screen taps / swipes do nothing
       press = { x: e.clientX, y: e.clientY, id: e.pointerId, done: false };
     });
     window.addEventListener('pointermove', function (e) {
@@ -398,8 +462,7 @@
       if (Math.max(ax, ay) < SWIPE) return;
       press.done = true;
       if (state === 'gameover') return;
-      if (ax > ay) attemptMove(dx > 0 ? 1 : -1, 0);
-      else attemptMove(0, dy < 0 ? 1 : -1);
+      swipeMove(dx, dy);
     });
     window.addEventListener('pointerup', function (e) {
       if (!press || press.id !== e.pointerId) return;
@@ -475,6 +538,15 @@
     el.dpadOptButtons.forEach(function (btn) {
       btn.addEventListener('click', function () { applyDpad(btn.getAttribute('data-dpad') === 'on'); });
     });
+    el.swipeButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () { applySwipe(btn.getAttribute('data-swipe')); });
+    });
+    el.dswapButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () { applyDpadSwap(btn.getAttribute('data-dswap') === 'on'); });
+    });
+    el.setTabs.forEach(function (t) {
+      t.addEventListener('click', function () { showSection(t.getAttribute('data-sec')); });
+    });
     el.musicSlider.addEventListener('input', function () {
       unlockAudio();
       var v = parseInt(el.musicSlider.value, 10) / 100;
@@ -507,11 +579,33 @@
   }
 
   function applyDpad(on) {
+    dpadOn = on;
     localStorage.setItem(CONFIG.DPAD_KEY, on ? 'on' : 'off');
     el.dpad.classList.toggle('show', on);
+    el.startHint.textContent = on ? 'use the D-pad or press PLAY' : 'or tap anywhere · press an arrow key';
     el.dpadOptButtons.forEach(function (btn) {
       btn.classList.toggle('active', btn.getAttribute('data-dpad') === (on ? 'on' : 'off'));
     });
+  }
+
+  // Touch screens: swap which side the Up/Down pair and the Left/Right pair sit on.
+  function applyDpadSwap(swap) {
+    localStorage.setItem(CONFIG.DPAD_SWAP_KEY, swap ? 'on' : 'off');
+    document.body.classList.toggle('dpad-swap', swap);
+    el.dswapButtons.forEach(function (b) { b.classList.toggle('active', (b.getAttribute('data-dswap') === 'on') === swap); });
+  }
+
+  function applySwipe(style) {
+    swipeStyle = style;
+    localStorage.setItem(CONFIG.SWIPE_KEY, style);
+    el.swipeButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-swipe') === style); });
+  }
+
+  // Settings page is split into sections (tabs); remember the last one used.
+  function showSection(sec) {
+    localStorage.setItem(CONFIG.TAB_KEY, sec);
+    el.setTabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-sec') === sec); });
+    el.setSecs.forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-sec') === sec); });
   }
 
   function applyTod(mode) {

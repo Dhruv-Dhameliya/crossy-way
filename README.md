@@ -22,8 +22,10 @@ You lose if you get hit, fall in the water, or the eagle gets you.
 | Device | Move | Other |
 | --- | --- | --- |
 | Keyboard | Arrow keys or WASD | Space = forward, Esc = pause |
-| Touch | Tap = hop forward, swipe = hop that way | Optional on-screen D-pad in Settings |
+| Touch | Tap = hop forward. Swipe along the lanes you see — diagonal swipes follow the camera angle (Lean Left / Right) | Optional on-screen D-pad in Settings |
 | Mouse | Click = hop forward, drag = hop that way | |
+
+**On-screen D-pad (touch screens):** Up/Down sit on one side and Left/Right on the other — you can swap the sides in Settings. While the D-pad is on, taps and swipes on the screen are turned off so nothing happens by accident.
 
 ## Collect
 
@@ -54,6 +56,6 @@ The game slowly cycles from **day** to **sunset**, **night** and **dawn** as you
 
 ## Music & settings
 
-A live-composed soundtrack plays in the background — bouncy by day, calm at night — with its own **volume slider**. In Settings you can also pick the camera view (lean left / right), force day, night or a weather type, choose graphics quality (it auto-adjusts to your device), switch sound effects on or off, change the title font and turn on an on-screen D-pad. Your top score, coins, outfits and missions are saved on your device.
+A live-composed soundtrack plays in the background — bouncy by day, calm at night — with its own **volume slider**. Settings is split into tabs — **Controls** (camera view, swipe style, D-pad and its layout), **World** (time of day and weather), **Audio** (music and sound effects) and **Display** (graphics quality and title font). Your top score, coins, outfits and missions are saved on your device.
 
 Enjoy the ride! 🚗🚆🐔

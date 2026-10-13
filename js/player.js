@@ -26,7 +26,7 @@ function Player(scene) {
 
   // Shield bubble (Shield power-up)
   this.bubble = new THREE.Mesh(
-    new THREE.SphereGeometry(0.68, 16, 12),
+    new THREE.SphereGeometry(0.6, 16, 12),
     new THREE.MeshBasicMaterial({ color: 0x4aa3ff, transparent: true, opacity: 0.3, depthWrite: false })
   );
   this.bubble.position.y = 0.45;
@@ -79,8 +79,8 @@ Player.prototype.buildModel = function () {
   body.add(Utils.voxelMesh([
     { x: -0.12, y: 0.09, z: 0, w: 0.09, h: 0.18, d: 0.09, color: s.legs },
     { x: 0.12, y: 0.09, z: 0, w: 0.09, h: 0.18, d: 0.09, color: s.legs },
-    { x: -0.12, y: 0.015, z: 0.05, w: 0.14, h: 0.03, d: 0.2, color: s.legs },
-    { x: 0.12, y: 0.015, z: 0.05, w: 0.14, h: 0.03, d: 0.2, color: s.legs }
+    { x: -0.12, y: 0.015, z: 0.0, w: 0.14, h: 0.03, d: 0.2, color: s.legs },
+    { x: 0.12, y: 0.015, z: 0.0, w: 0.14, h: 0.03, d: 0.2, color: s.legs }
   ], own));
 
   var torso = [
@@ -120,6 +120,7 @@ Player.prototype.buildModel = function () {
   this.wingR.position.set(0.295, 0.45, -0.02);
   body.add(this.wingR);
 
+  body.scale.setScalar(CONFIG.CHICKEN_SCALE);
   body.traverse(function (o) { if (o.isMesh) { o.castShadow = true; } });
   this.bodyGroup = body;
   this.group.add(body);

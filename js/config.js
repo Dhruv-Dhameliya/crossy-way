@@ -8,6 +8,9 @@ var CONFIG = {
   ROWS_AHEAD: 21,           // rows kept generated ahead of the camera
   ROWS_BEHIND: 17,          // rows kept behind the camera (visual buffer)
 
+  CHICKEN_SCALE: 0.88,      // the chicken's size relative to a tile (a touch smaller than before)
+  HIT_MARGIN: 0.26,         // how close a hazard must get to the chicken's centre to hit it (= half its body)
+
   HOP_DURATION: 0.15,       // seconds per hop
   HOP_HEIGHT: 0.5,
 
@@ -65,6 +68,9 @@ var CONFIG = {
   SOUND_KEY: 'crossy_way_sound',
   QUALITY_KEY: 'crossy_way_quality',
   DPAD_KEY: 'crossy_way_dpad',
+  DPAD_SWAP_KEY: 'crossy_way_dpad_swap',
+  SWIPE_KEY: 'crossy_way_swipe_style',
+  TAB_KEY: 'crossy_way_settings_tab',
   TOD_KEY: 'crossy_way_time_of_day',
   WEATHER_KEY: 'crossy_way_weather'
 };

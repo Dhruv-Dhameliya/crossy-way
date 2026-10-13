@@ -372,7 +372,7 @@ World.prototype.vehicleAudio = function (row) {
     if (adx > 10) { v.heard = 0; v.tracked = false; v.nm = false; v.minD = undefined; continue; }
     // close call: you stood in the lane and a vehicle swept by with only a sliver to spare
     if (dz < 0.5 && !ls.ghost && this.onNearMiss && !v.nm) {
-      var clear = adx - (v.halfWidth + 0.3);
+      var clear = adx - (v.halfWidth + CONFIG.HIT_MARGIN);
       var passedBy = dx * row.dir > 0;
       if (!passedBy && clear > 0 && clear < 0.9) { v.tracked = true; v.minD = Math.min(v.minD === undefined ? 9 : v.minD, clear); }
       else if (passedBy && v.tracked && v.minD < 0.55) { v.nm = true; v.tracked = false; this.onNearMiss(v, row); }
@@ -715,7 +715,7 @@ World.prototype.checkVehicleHit = function (x, z) {
   if (!row || row.type !== CONFIG.ROW_TYPES.ROAD) return null;
   for (var i = 0; i < row.vehicles.length; i++) {
     var v = row.vehicles[i];
-    if (Math.abs(v.x - x) < v.halfWidth + 0.3) return v;
+    if (Math.abs(v.x - x) < v.halfWidth + CONFIG.HIT_MARGIN) return v;
   }
   return null;
 };
@@ -728,7 +728,7 @@ World.prototype.checkTrainHit = function (x, z) {
   var seg = Models.TRAIN_SEG;
   var minX = t.x - (t.direction > 0 ? t.length - seg / 2 : seg / 2);
   var maxX = t.x + (t.direction > 0 ? seg / 2 : t.length - seg / 2);
-  return x >= minX - 0.3 && x <= maxX + 0.3;
+  return x >= minX - CONFIG.HIT_MARGIN && x <= maxX + CONFIG.HIT_MARGIN;
 };
 
 // A log or lily pad that carries a chicken standing at x on this water row.
