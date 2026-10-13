@@ -22,6 +22,13 @@ var Music = (function () {
     scale: [57, 60, 62, 64, 67, 69, 72, 74, 76]
   };
 
+  // Space: slow, floaty and a little mysterious (D minor, shimmering high notes)
+  var SPACE = {
+    bpm: 82,
+    chords: [[62, 65, 69, 38], [58, 62, 65, 34], [60, 64, 67, 36], [57, 60, 64, 33]],
+    scale: [62, 65, 67, 69, 72, 74, 77, 79, 81]
+  };
+
   function loadVol() {
     var v = parseFloat(localStorage.getItem(KEY));
     return isNaN(v) ? 0.5 : Utils.clamp(v, 0, 1);
@@ -68,9 +75,10 @@ var Music = (function () {
   // A fresh 4-bar melody: chord tones on strong beats, a random walk in between.
   function makePlan() {
     var night = mood === 'night';
-    var cfg = night ? NIGHT : DAY;
+    var space = mood === 'space';
+    var cfg = space ? SPACE : night ? NIGHT : DAY;
     var spots = [0, 2, 3, 6, 8, 10, 11, 14];
-    var prob = night ? 0.5 : 0.75;
+    var prob = space ? 0.4 : night ? 0.5 : 0.75;
     var idx = Utils.randInt(2, 5);
     var melody = [];
     for (var b = 0; b < 4; b++) {
@@ -92,14 +100,24 @@ var Music = (function () {
       });
       melody.push(bar);
     }
-    return { cfg: cfg, melody: melody, night: night, stepDur: 60 / cfg.bpm / 4 };
+    return { cfg: cfg, melody: melody, night: night, space: space, stepDur: 60 / cfg.bpm / 4 };
   }
 
   function playStep(n, t) {
     var s = n % 16, bar = Math.floor(n / 16) % 4;
     var P = plan, chord = P.cfg.chords[bar];
     var lead = P.melody[bar][s];
-    if (!P.night) {
+    if (P.space) {
+      // floaty pad, a soft heartbeat and twinkling high notes
+      if (s === 0) {
+        for (var sc = 0; sc < 3; sc++) note(chord[sc], t, P.stepDur * 15, 'sine', 0.06);
+        note(chord[3], t, P.stepDur * 14, 'sine', 0.26);
+      }
+      if (s === 0 || s === 8) kick(t, 0.35);
+      if (s % 2 === 0) note(chord[[0, 1, 2, 1][(s / 2) % 4]] + 24, t, P.stepDur * 1.6, 'sine', 0.03);
+      if (s === 6 || s === 14) note(chord[1] + 12, t, P.stepDur * 3, 'triangle', 0.04);
+      if (lead) note(lead, t, P.stepDur * 4, 'sine', 0.08);
+    } else if (!P.night) {
       // drums
       if (s % 4 === 0) kick(t, 0.9);
       if (s === 4 || s === 12) noiseHit(t, 0.13, 0.32, 'bandpass', 1900);
@@ -167,7 +185,7 @@ var Music = (function () {
       applyLevel(true);
     },
     getVolume: function () { return vol; },
-    // 'day' | 'night': changes at the next four-bar phrase
+    // 'day' | 'night' | 'space': changes at the next four-bar phrase
     setMood: function (m) {
       if (!m || m === mood) return;
       mood = m;

@@ -27,6 +27,10 @@ var Models = (function () {
     return m;
   }
 
+  // Other biomes (space...) register their props here: same kinds, new looks.
+  var BIOMES = {};
+  function biomeOf(name) { return name ? BIOMES[name] || null : null; }
+
   // ---------------------------------------------------------------------
   // Scenery (box lists, positioned at tile column x on a row whose surface is y=0)
   // ---------------------------------------------------------------------
@@ -34,7 +38,9 @@ var Models = (function () {
 
   function jitter(color) { return Utils.shade(color, Utils.randRange(-0.06, 0.06)); }
 
-  function treeBoxes(out, x, z, kind) {
+  function treeBoxes(out, x, z, kind, biome) {
+    var bm = biomeOf(biome);
+    if (bm) return bm.border(out, x, z, kind);
     var dark = jitter(0x2f9a3e), light = jitter(0x47b455);
     if (kind === 0) {            // round oak
       out.push(B(x, 0.2, z, 0.26, 0.4, 0.26, TRUNK));
@@ -63,7 +69,9 @@ var Models = (function () {
     }
   }
 
-  function rockBoxes(out, x, z) {
+  function rockBoxes(out, x, z, biome) {
+    var bm = biomeOf(biome);
+    if (bm) return bm.rock(out, x, z);
     var base = Utils.choice([0x9aa3ab, 0x8d969e, 0xa6aeb5]);
     out.push(B(x, 0.17, z, 0.7, 0.34, 0.64, base));
     out.push(B(x + 0.08, 0.42, z - 0.04, 0.42, 0.24, 0.4, Utils.shade(base, 0.15)));
@@ -79,7 +87,9 @@ var Models = (function () {
     }
   }
 
-  function flowerBoxes(out, x, z) {
+  function flowerBoxes(out, x, z, biome) {
+    var bm = biomeOf(biome);
+    if (bm) return bm.flower(out, x, z);
     var c = Utils.choice([0xffffff, 0xffe14d, 0xff8fb3, 0xc79bff]);
     var ox = Utils.randRange(-0.3, 0.3), oz = Utils.randRange(-0.3, 0.3);
     out.push(B(x + ox, 0.05, z + oz, 0.04, 0.1, 0.04, 0x3f9f4b));
@@ -149,8 +159,10 @@ var Models = (function () {
     { value: 'mushroom', weight: 0.02 }
   ];
   // One random blocker for a tile (all of them stop the chicken like a tree does).
-  function obstacleBoxes(out, x, z) {
+  function obstacleBoxes(out, x, z, biome) {
     var kind = Utils.weightedChoice(OBSTACLE_ODDS);
+    var bm = biomeOf(biome);
+    if (bm && bm.obstacles[kind]) { bm.obstacles[kind](out, x, z); return kind; }
     switch (kind) {
       case 'tree': treeBoxes(out, x, z, Utils.randInt(0, 3)); break;
       case 'rock': rockBoxes(out, x, z); break;
@@ -390,13 +402,15 @@ var Models = (function () {
     ]);
   }
 
-  function buildVehicle(kind) {
-    var def = VEHICLES[kind];
+  function buildVehicle(kind, biome) {
+    var bm = biomeOf(biome);
+    var def = (bm && bm.vehicles[kind]) || VEHICLES[kind];
+    var palette = bm ? bm.vehicleColors : CAR_COLORS;
     var color = kind === 'bus' ? Utils.choice([0xffc933, 0xe8453c, 0x3f7fe0, 0x35b86b])
       : kind === 'truck' ? Utils.choice([0xe8453c, 0x3f7fe0, 0xffa726, 0x35b86b])
-        : Utils.choice(CAR_COLORS);
+        : Utils.choice(palette);
     var variant = Utils.randInt(0, 2);
-    var mesh = cachedMesh('veh:' + kind + ':' + color + ':' + variant, function () { return def.build(color); });
+    var mesh = cachedMesh('veh:' + (biome || '') + ':' + kind + ':' + color + ':' + variant, function () { return def.build(color); });
     mesh.add(buildBeam(def.len)); // headlight glow, only drawn at night
     return mesh;
   }
@@ -439,8 +453,9 @@ var Models = (function () {
   // ---------------------------------------------------------------------
   // River floaters
   // ---------------------------------------------------------------------
-  function buildLog(length) {
-    return cachedMesh('log:' + length + ':' + Utils.randInt(0, 2), function () { return logBoxes(length); });
+  function buildLog(length, biome) {
+    var bm = biomeOf(biome);
+    return cachedMesh('log:' + (biome || '') + ':' + length + ':' + Utils.randInt(0, 2), function () { return bm ? bm.logBoxes(length) : logBoxes(length); });
   }
 
   function logBoxes(length) {
@@ -458,7 +473,9 @@ var Models = (function () {
   }
 
   // A group of n turtles that paddle along; the world makes them dive now and then.
-  function buildTurtles(n) {
+  function buildTurtles(n, biome) {
+    var bm = biomeOf(biome);
+    if (bm) return Utils.voxelMesh(bm.turtleBoxes(n));
     var o = [];
     for (var i = 0; i < n; i++) {
       var x = (i - (n - 1) / 2) * 1.05;
@@ -479,7 +496,9 @@ var Models = (function () {
   }
 
   var _padGeo = null, _padMat = null, _flowerMat = null, _flowerGeo = null;
-  function buildPad(withFlower) {
+  function buildPad(withFlower, biome) {
+    var bm = biomeOf(biome);
+    if (bm) return bm.pad(withFlower);
     if (!_padGeo) {
       _padGeo = new THREE.CylinderGeometry(0.43, 0.43, 0.07, 10);
       _padGeo.__shared = true;
@@ -509,8 +528,9 @@ var Models = (function () {
   // ---------------------------------------------------------------------
   var TRAIN_SEG = 1.7;
 
-  function buildLocomotive() {
-    return cachedMesh('loco', locomotiveBoxes);
+  function buildLocomotive(biome) {
+    var bm = biomeOf(biome);
+    return cachedMesh('loco:' + (biome || ''), bm ? bm.locoBoxes : locomotiveBoxes);
   }
 
   function locomotiveBoxes() {
@@ -533,9 +553,10 @@ var Models = (function () {
   }
 
   var TRAIN_CAR_COLORS = [0x8b4a2b, 0x3b6ea5, 0xb7791f, 0x4a7a4a, 0x6b6f78];
-  function buildTrainCar() {
-    var c = Utils.choice(TRAIN_CAR_COLORS);
-    return cachedMesh('car:' + c, function () { return trainCarBoxes(c); });
+  function buildTrainCar(biome) {
+    var bm = biomeOf(biome);
+    var c = Utils.choice(bm ? bm.carColors : TRAIN_CAR_COLORS);
+    return cachedMesh('car:' + (biome || '') + ':' + c, function () { return bm ? bm.carBoxes(c) : trainCarBoxes(c); });
   }
 
   function trainCarBoxes(c) {
@@ -702,6 +723,7 @@ var Models = (function () {
     g.add(buildCoin());
     g.add(buildSignal().group);
     g.add(buildPad(true));
+    if (BIOMES.space) g.add(buildPad(true, 'space'));
     g.add(buildBeam(1.2));
     g.add(buildTurtles(2));
     g.add(Utils.voxelMesh([B(0, 0.1, 0, 0.1, 0.2, 0.1, 0x3f9f4b)], { material: sceneryMaterial() }));
@@ -714,34 +736,212 @@ var Models = (function () {
   // Eagle (idle / fell-behind death)
   // ---------------------------------------------------------------------
   function buildEagle() {
-    var g = new THREE.Group();
+    var g = new THREE.Group();            // looks along +z
+    var BROWN = 0x5b3a1e, DARKB = 0x3b2410, LIGHTB = 0x80562f, WHITE = 0xf4f1ea, YEL = 0xf2b21c;
     g.add(Utils.voxelMesh([
-      B(0, 0, 0, 0.56, 0.46, 1.0, 0x5b3a1e),
-      B(0, 0.04, 0.58, 0.42, 0.38, 0.42, 0xf4f1ea),
-      B(0, -0.01, 0.88, 0.16, 0.16, 0.24, 0xf2b21c),
-      B(0.18, 0.1, 0.72, 0.05, 0.07, 0.05, 0x111111),
-      B(-0.18, 0.1, 0.72, 0.05, 0.07, 0.05, 0x111111),
-      B(0, 0.02, -0.72, 0.42, 0.1, 0.5, 0xf4f1ea),
-      B(0.14, -0.3, 0.05, 0.1, 0.22, 0.1, 0xf2b21c),
-      B(-0.14, -0.3, 0.05, 0.1, 0.22, 0.1, 0xf2b21c),
-      B(0.14, -0.43, 0.1, 0.14, 0.05, 0.22, 0xf2b21c),
-      B(-0.14, -0.43, 0.1, 0.14, 0.05, 0.22, 0xf2b21c)
+      B(0, 0, 0, 0.5, 0.42, 0.9, BROWN),                    // torso
+      B(0, -0.1, 0.06, 0.4, 0.2, 0.7, LIGHTB),               // chest
+      B(0, 0.03, 0.5, 0.4, 0.34, 0.34, WHITE),               // neck
+      B(0, -0.04, 0.34, 0.36, 0.14, 0.2, LIGHTB),
+      B(0, 0.12, -0.12, 0.44, 0.1, 0.5, DARKB),              // back feathers
+      B(-0.16, -0.16, -0.12, 0.14, 0.2, 0.22, LIGHTB),       // feathered thighs
+      B(0.16, -0.16, -0.12, 0.14, 0.2, 0.22, LIGHTB),
+      B(0, 0.02, -0.6, 0.3, 0.07, 0.46, WHITE),              // tail fan
+      B(-0.15, 0.02, -0.74, 0.14, 0.06, 0.46, WHITE),
+      B(0.15, 0.02, -0.74, 0.14, 0.06, 0.46, WHITE),
+      B(0, 0.02, -0.98, 0.5, 0.05, 0.08, 0xdcd8cc)
     ]));
-    function wing(sign) {
-      var pivot = new THREE.Group();
-      pivot.position.set(sign * 0.26, 0.14, 0.05);
-      pivot.add(Utils.voxelMesh([
-        B(sign * 0.5, 0, 0, 1.0, 0.1, 0.62, 0x4a2f17),
-        B(sign * 1.25, 0, -0.04, 0.55, 0.08, 0.5, 0x3a2412),
-        B(sign * 1.62, 0, -0.1, 0.22, 0.06, 0.36, 0xf4f1ea)
+    var head = new THREE.Group();
+    head.position.set(0, 0.07, 0.72);
+    head.add(Utils.voxelMesh([
+      B(0, 0, 0, 0.34, 0.32, 0.3, WHITE),
+      B(0, -0.04, 0.24, 0.15, 0.15, 0.2, YEL),               // beak
+      B(0, -0.14, 0.33, 0.09, 0.1, 0.07, YEL),               // hook
+      B(-0.19, 0.04, 0.06, 0.05, 0.08, 0.09, 0xffd23f),      // eyes
+      B(0.19, 0.04, 0.06, 0.05, 0.08, 0.09, 0xffd23f),
+      B(-0.2, 0.04, 0.1, 0.03, 0.04, 0.03, 0x111111),
+      B(0.2, 0.04, 0.1, 0.03, 0.04, 0.03, 0x111111),
+      B(-0.19, 0.12, 0.08, 0.06, 0.04, 0.14, 0xe4dfd0),      // stern brows
+      B(0.19, 0.12, 0.08, 0.06, 0.04, 0.14, 0xe4dfd0)
+    ]));
+    g.add(head);
+
+    function leg(sign) {
+      var p = new THREE.Group();
+      p.position.set(sign * 0.15, -0.26, -0.05);
+      p.add(Utils.voxelMesh([
+        B(0, -0.1, 0, 0.09, 0.22, 0.09, YEL),
+        B(0, -0.23, 0.08, 0.18, 0.05, 0.22, YEL),
+        B(-0.06, -0.24, 0.22, 0.03, 0.05, 0.1, 0x2b2b2b),
+        B(0, -0.24, 0.24, 0.03, 0.05, 0.12, 0x2b2b2b),
+        B(0.06, -0.24, 0.22, 0.03, 0.05, 0.1, 0x2b2b2b)
       ]));
-      g.add(pivot);
-      return pivot;
+      p.rotation.x = -0.9;                                   // tucked up in flight
+      g.add(p);
+      return p;
     }
-    return { group: g, wingL: wing(-1), wingR: wing(1) };
+    var legL = leg(-1), legR = leg(1);
+
+    // A wing is two hinged parts: the arm (shoulder pivot) and the hand with
+    // its finger feathers (elbow pivot), so it can bend like a real wing.
+    function wing(sign) {
+      var shoulder = new THREE.Group();
+      shoulder.position.set(sign * 0.24, 0.14, 0.14);
+      shoulder.add(Utils.voxelMesh([
+        B(sign * 0.4, 0, -0.02, 0.8, 0.08, 0.7, BROWN),
+        B(sign * 0.4, 0.045, 0.1, 0.8, 0.02, 0.3, LIGHTB),
+        B(sign * 0.4, -0.01, -0.34, 0.8, 0.05, 0.16, DARKB)    // trailing feathers
+      ]));
+      var elbow = new THREE.Group();
+      elbow.position.set(sign * 0.8, 0, 0);
+      var o = [
+        B(sign * 0.32, 0, -0.06, 0.64, 0.07, 0.54, DARKB),
+        B(sign * 0.32, 0.04, 0.06, 0.6, 0.02, 0.2, BROWN)
+      ];
+      for (var i = 0; i < 4; i++) {                            // spread primaries
+        var len = 0.5 - i * 0.06;
+        o.push(B(sign * (0.64 + len / 2 - 0.02), 0, 0.16 - i * 0.15, len, 0.045, 0.12, i === 3 ? 0xf1ece0 : DARKB));
+        o.push(B(sign * (0.64 + len - 0.03), 0, 0.16 - i * 0.15, 0.1, 0.05, 0.12, WHITE));
+      }
+      elbow.add(Utils.voxelMesh(o));
+      shoulder.add(elbow);
+      g.add(shoulder);
+      return { shoulder: shoulder, elbow: elbow };
+    }
+    var wl = wing(-1), wr = wing(1);
+    return {
+      group: g, head: head, legL: legL, legR: legR,
+      wingL: wl.shoulder, wingR: wr.shoulder, elbowL: wl.elbow, elbowR: wr.elbow
+    };
   }
 
+  // ---------------------------------------------------------------------
+  // Crocodile logs: a floating croc you can ride on its back - but its head
+  // snaps shut now and then. The world animates `jaw` (pivot) and decides
+  // when the head is dangerous.
+  // ---------------------------------------------------------------------
+  var CROC_PAL = {
+    forest: { body: 0x4a8f3a, belly: 0xcfd98a, dark: 0x2f6a2a, ridge: 0x3a7a2e, eye: 0xffe14d, mouth: 0xd94a4a },
+    space: { body: 0x6b4fd8, belly: 0xb7a3ff, dark: 0x3a2f8f, ridge: 0x45e6a8, eye: 0x7df3ff, mouth: 0xff5fd2 }
+  };
+  var CROC_HEAD = 1.0; // length of the dangerous head at the front
+
+  function buildCroc(length, biome) {
+    var pal = CROC_PAL[biome] || CROC_PAL.forest;
+    var g = new THREE.Group();
+    var L = length, bodyLen = L - CROC_HEAD + 0.2, cx = -L / 2 + bodyLen / 2;
+    var o = [];
+    o.push(B(cx, 0, 0, bodyLen, 0.34, 0.74, pal.body));
+    o.push(B(cx, -0.12, 0, bodyLen, 0.1, 0.72, pal.dark));
+    o.push(B(cx, 0.175, 0, bodyLen * 0.94, 0.02, 0.5, Utils.shade(pal.body, 0.14)));
+    o.push(B(cx, -0.04, 0.375, bodyLen * 0.9, 0.14, 0.03, pal.belly));            // pale flanks
+    o.push(B(cx, -0.04, -0.375, bodyLen * 0.9, 0.14, 0.03, pal.belly));
+    o.push(B(-L / 2 - 0.1, 0.0, 0, 0.3, 0.22, 0.44, pal.body));          // tapering tail
+    o.push(B(-L / 2 - 0.3, -0.02, 0, 0.3, 0.14, 0.26, pal.dark));
+    for (var i = 0; i < Math.floor(bodyLen / 0.34); i++) {              // back ridges
+      o.push(B(-L / 2 + 0.15 + i * 0.34, 0.25, 0, 0.14, 0.14, 0.2, pal.ridge));
+      o.push(B(-L / 2 + 0.15 + i * 0.34, 0.2, 0.2, 0.1, 0.06, 0.1, pal.ridge));
+      o.push(B(-L / 2 + 0.15 + i * 0.34, 0.2, -0.2, 0.1, 0.06, 0.1, pal.ridge));
+    }
+    [-1, 1].forEach(function (s) {                                       // stubby legs
+      o.push(B(cx + bodyLen * 0.25, -0.08, s * 0.42, 0.26, 0.1, 0.14, pal.dark));
+      o.push(B(cx - bodyLen * 0.25, -0.08, s * 0.42, 0.26, 0.1, 0.14, pal.dark));
+    });
+    // upper jaw + eyes (the lower jaw is a separate pivot so it can open)
+    var hx = L / 2 - CROC_HEAD / 2;
+    o.push(B(hx, 0.08, 0, CROC_HEAD, 0.2, 0.56, pal.body));
+    o.push(B(hx + 0.32, 0.06, 0, 0.4, 0.14, 0.4, pal.body));
+    o.push(B(hx - 0.2, 0.22, 0.2, 0.12, 0.12, 0.12, pal.eye));
+    o.push(B(hx - 0.2, 0.22, -0.2, 0.12, 0.12, 0.12, pal.eye));
+    o.push(B(hx - 0.15, 0.22, 0.2, 0.04, 0.06, 0.05, 0x111111));
+    o.push(B(hx - 0.15, 0.22, -0.2, 0.04, 0.06, 0.05, 0x111111));
+    for (var t = 0; t < 4; t++) {                                        // upper teeth
+      o.push(B(hx + 0.02 + t * 0.14, -0.04, 0.24, 0.06, 0.08, 0.04, 0xffffff));
+      o.push(B(hx + 0.02 + t * 0.14, -0.04, -0.24, 0.06, 0.08, 0.04, 0xffffff));
+    }
+    g.add(Utils.voxelMesh(o));
+    var jaw = new THREE.Group();
+    jaw.position.set(L / 2 - CROC_HEAD, -0.06, 0);
+    var j = [
+      B(CROC_HEAD / 2, -0.04, 0, CROC_HEAD - 0.02, 0.1, 0.5, pal.dark),
+      B(CROC_HEAD / 2, 0.02, 0, CROC_HEAD - 0.1, 0.04, 0.4, pal.mouth),
+      B(CROC_HEAD - 0.04, -0.02, 0, 0.1, 0.1, 0.3, pal.dark)
+    ];
+    for (var u = 0; u < 4; u++) {
+      j.push(B(0.2 + u * 0.18, 0.07, 0.2, 0.06, 0.09, 0.04, 0xffffff));
+      j.push(B(0.2 + u * 0.18, 0.07, -0.2, 0.06, 0.09, 0.04, 0xffffff));
+    }
+    jaw.add(Utils.voxelMesh(j));
+    g.add(jaw);
+    return { group: g, jaw: jaw, length: L, headLen: CROC_HEAD };
+  }
+
+  // ---------------------------------------------------------------------
+  // Moving platforms over a bottomless chasm (stone slab / hover plate)
+  // ---------------------------------------------------------------------
+  function buildPlatform(width, biome) {
+    return cachedMesh('plat:' + (biome || 'forest') + ':' + width, function () {
+      var o = [];
+      if (biome === 'space') {
+        o.push(B(0, 0, 0, width, 0.3, 0.78, 0x3d4470));
+        o.push(B(0, 0.165, 0, width - 0.1, 0.03, 0.66, 0x5a64a0));
+        o.push(B(0, -0.17, 0, width - 0.3, 0.05, 0.5, 0x4de8ff));
+        o.push(B(0, 0.19, 0, width - 0.3, 0.01, 0.04, 0x7df3ff));
+        o.push(B(-width / 2 + 0.2, 0.19, 0.22, 0.12, 0.02, 0.12, 0xff5fd2));
+        o.push(B(width / 2 - 0.2, 0.19, -0.22, 0.12, 0.02, 0.12, 0xff5fd2));
+        o.push(B(width / 2 + 0.01, 0, 0, 0.04, 0.32, 0.8, 0x7480a6));
+        o.push(B(-width / 2 - 0.01, 0, 0, 0.04, 0.32, 0.8, 0x7480a6));
+      } else {
+        o.push(B(0, 0, 0, width, 0.34, 0.78, 0x8d8f99));
+        o.push(B(0, -0.11, 0, width + 0.02, 0.12, 0.8, 0x6a6c76));
+        o.push(B(0, 0.175, 0, width * 0.94, 0.02, 0.58, 0xa9abb5));
+        o.push(B(-width / 2 + 0.3, 0.185, 0.1, 0.34, 0.02, 0.22, 0x5aa648));    // moss
+        o.push(B(width / 2 - 0.4, 0.185, -0.15, 0.24, 0.02, 0.18, 0x5aa648));
+        o.push(B(0, 0.19, 0, 0.3, 0.015, 0.3, 0xff8a3d));                       // rune
+        o.push(B(width / 2 + 0.01, 0, 0, 0.04, 0.36, 0.8, 0xc4c6d0));
+        o.push(B(-width / 2 - 0.01, 0, 0, 0.04, 0.36, 0.8, 0xc4c6d0));
+      }
+      return o;
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Biome portal: two pillars that mark where the world changes
+  // ---------------------------------------------------------------------
+  function buildGate(biome) {
+    var g = new THREE.Group();
+    var cols = biome === 'space'
+      ? { stone: 0x3a3e66, trim: 0x4de8ff, cap: 0xff5fd2 }
+      : { stone: 0x8d8f99, trim: 0x5aa648, cap: 0xffd23f };
+    [-1, 1].forEach(function (s) {
+      var o = [
+        B(0, 0.2, 0, 0.62, 0.4, 0.62, cols.stone),
+        B(0, 1.2, 0, 0.42, 1.6, 0.42, H_shade(cols.stone, 0.12)),
+        B(0, 0.5, 0, 0.46, 0.06, 0.46, cols.trim),
+        B(0, 1.5, 0, 0.46, 0.06, 0.46, cols.trim),
+        B(0, 2.1, 0, 0.6, 0.18, 0.6, cols.stone),
+        B(0, 2.3, 0, 0.26, 0.26, 0.26, cols.cap)
+      ];
+      var m = Utils.voxelMesh(o);
+      m.position.x = s * (CONFIG.PLAY_HALF + 1.6);
+      g.add(m);
+      g.userData['gem' + (s > 0 ? 'R' : 'L')] = m;
+    });
+    return g;
+  }
+  function H_shade(c, a) { return Utils.shade(c, a); }
+
   return {
+    helpers: {
+      B: B, cachedMesh: cachedMesh, shade: Utils.shade, choice: Utils.choice,
+      randRange: Utils.randRange, randInt: Utils.randInt
+    },
+    registerBiome: function (name, def) { BIOMES[name] = def; },
+    hasBiome: function (name) { return !!BIOMES[name]; },
+    buildCroc: buildCroc,
+    buildPlatform: buildPlatform,
+    buildGate: buildGate,
+    CROC_HEAD: CROC_HEAD,
     treeBoxes: treeBoxes,
     obstacleBoxes: obstacleBoxes,
     isSmallObstacle: isSmallObstacle,

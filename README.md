@@ -9,13 +9,16 @@ A fast, colourful hopping game. Guide a little chicken across endless roads, riv
 - **Cross rivers** by hopping onto floating logs and lily pads. Don't fall in!
 - **Watch the tracks.** Railway signals are **green** when the track is clear and **flash red** (with a bell and a whistle) a few seconds before a train comes.
 - **Mind the turtles.** Turtle rivers look friendly, but the turtles shake and then dive — hop off in time!
+- **Beware crocodile logs.** You can ride a crocodile's back, but when its mouth starts to open the head is about to snap shut — keep away from the front!
+- **Slippery ice.** Hop onto an ice lane and you keep gliding a little (up to 3 tiles sideways, one lane forward or back). Plan your next hop.
+- **Chasms.** Some lanes are a bottomless drop with nothing but moving platforms to cross them. Time your hop — miss and you fall.
 - **Don't dawdle.** Stand still and you'll hear the **eagle screech**; 3 seconds later it swoops in. Reach a new row to send it away.
 
-You lose if you get hit, fall in the water, or the eagle gets you.
+You lose if you get hit, fall in the water or a chasm, get eaten by a crocodile, or the eagle gets you.
 
 ## Difficulty
 
-Pick **Easy, Medium, Hard or Extreme** in Settings. Harder modes mean faster and busier traffic, more frequent trains, faster rivers and a quicker eagle (Easy 12 s, Medium 9 s, Hard 7.5 s, Extreme 6 s). Each difficulty keeps its own top score.
+Pick **Easy, Medium, Hard or Extreme** in Settings. Harder modes mean faster and busier traffic, more frequent trains, faster rivers and a quicker eagle (Easy 12 s, Medium 9 s, Hard 7.5 s, Extreme 6 s). **Each difficulty keeps its own top score** — you'll see them listed on the difficulty buttons, and the 🏆 chip on screen and the game-over card show the top score for the mode you're playing.
 
 ## Scoring
 
@@ -61,12 +64,26 @@ Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, 
 - **Daily Challenge** — a new goal every day, the same for everyone. Finish it to earn bonus coins and build a 🔥 streak for bigger rewards.
 - **Missions** — three rolling goals like "collect 30 coins" or "reach row 50". Finish one and a red dot appears on the Missions button. Open it to watch the bar fill, turn green and slide away, and a fresh mission takes its place.
 
+## Biomes 🚀
+
+The world has more than one look. Run far enough in the **Forest** and a portal carries you into **Space**: crystals, crates and radar dishes block your way, hover cars and maglev trains replace the traffic, rivers glow with energy, and your chicken puts on an **astronaut helmet**. It's the same game — only the design and the obstacles change — and the night sky fills with drifting dust and meteors (rain becomes a **meteor shower**). In Settings → World you can pick **Auto** (Forest → Space → Forest…), or lock **Forest** or **Space**.
+
+## Share your score 📸
+
+On the game-over card, **Share** makes a picture card — a snapshot of your run, your score, difficulty, biome and top score. Share it straight to your apps, **save** it as an image, or **copy** it.
+
 ## The world
 
 The game slowly cycles from **day** to **sunset**, **night** and **dawn** as you run (vehicles switch on their headlights after dark). The **weather** changes too: clear skies, **rain** with thunder and lightning, and **fog**.
 
 ## Music & settings
 
-A live-composed soundtrack plays in the background — bouncy by day, calm at night — with its own **volume slider**. Settings is split into tabs — **Controls** (camera view, swipe style, D-pad and its layout), **World** (time of day and weather), **Audio** (music and sound effects) and **Display** (graphics quality and title font). Your top score, coins, outfits and missions are saved on your device.
+A live-composed soundtrack plays in the background — bouncy by day, calm at night, floaty in space — with its own **volume slider**. The eagle's cry, the train horn and the crossing bell are real recordings. Settings is split into tabs — **Controls** (camera view, swipe style, D-pad and its layout), **World** (time of day and weather), **Audio** (music and sound effects) and **Display** (graphics quality and title font). Your top score, coins, outfits and missions are saved on your device.
+
+## Sound credits
+
+- Bald eagle call — U.S. National Park Service (public domain), via Wikimedia Commons.
+- Train horn — "Nathan M5" by HarveyHenkelmann (CC0), via Wikimedia Commons.
+- Bell — "Old school bell 4" by ezwa (public domain), via Wikimedia Commons.
 
 Enjoy the ride! 🚗🚆🐔

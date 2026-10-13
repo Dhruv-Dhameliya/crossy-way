@@ -84,6 +84,7 @@ var CONFIG = {
 
   DPAD_KEY: 'crossy_way_dpad',
   DPAD_SWAP_KEY: 'crossy_way_dpad_swap',
+  BIOME_KEY: 'crossy_way_biome',
   DPAD_SIZE_KEY: 'crossy_way_dpad_size',
   SWIPE_KEY: 'crossy_way_swipe_style',
   TAB_KEY: 'crossy_way_settings_tab',
@@ -99,4 +100,45 @@ var Difficulty = {
     return CONFIG.DIFFICULTY[m] ? m : 'medium';
   })(),
   get cur() { return CONFIG.DIFFICULTY[this.mode]; }
+};
+
+// ---------------------------------------------------------------------------
+// Biomes. Same game in every biome - only the look (ground, props, vehicles,
+// lighting, sounds) changes. Lane variants (ice / void) exist in every biome.
+// ---------------------------------------------------------------------------
+CONFIG.BIOME_COLORS = {
+  forest: Object.assign({}, CONFIG.COLORS, {
+    iceA: 0xcdeffa, iceB: 0xbfe6f5, iceSide: 0x8fc4d8,
+    voidA: 0x231b15, voidB: 0x1b1410, voidSide: 0x0d0907, voidAccent: 0xff8a3d,
+    backdrop: CONFIG.COLORS.grassB
+  }),
+  space: {
+    sky: 0x120f2e,
+    grassA: 0x6f6c92, grassB: 0x66638a, grassSide: 0x3f3d62,
+    roadA: 0x23273f, roadB: 0x1e2237, roadSide: 0x12142a, roadLine: 0x4de8ff,
+    waterA: 0x6a3cff, waterB: 0x5a2fe0, waterSide: 0x2c1a80, waterAccent: 0x8ff4ff,
+    railBedA: 0x3a3f5c, railBedB: 0x343955, railSide: 0x1d2038, sleeper: 0x2fd4e8, rail: 0xaef6ff,
+    iceA: 0x9fe9ff, iceB: 0x8adcf5, iceSide: 0x4aa3c8,
+    voidA: 0x050610, voidB: 0x03040b, voidSide: 0x000000, voidAccent: 0x8f6bff,
+    coin: CONFIG.COLORS.coin, coinDark: CONFIG.COLORS.coinDark, coinShine: CONFIG.COLORS.coinShine,
+    backdrop: 0x2a2750
+  }
+};
+
+// Which biome a row belongs to. "auto" walks through the biomes as you run
+// (Forest, then Space, then back...); "forest" / "space" lock one in.
+var Biome = {
+  mode: (function () {
+    var m = null;
+    try { m = localStorage.getItem(CONFIG.BIOME_KEY); } catch (e) { /* private mode */ }
+    return m === 'forest' || m === 'space' ? m : 'auto';
+  })(),
+  LEN: 110,                      // rows per biome in auto mode
+  order: ['forest', 'space'],
+  forRow: function (z) {
+    if (this.mode !== 'auto') return this.mode;
+    if (z < 0) return this.order[0];
+    return this.order[Math.floor(z / this.LEN) % this.order.length];
+  },
+  colors: function (b) { return CONFIG.BIOME_COLORS[b] || CONFIG.BIOME_COLORS.forest; }
 };

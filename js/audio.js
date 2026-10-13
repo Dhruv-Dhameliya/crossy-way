@@ -1,4 +1,6 @@
-// Synthesized sound effects and ambience via WebAudio - no audio files needed.
+// Sound effects and ambience via WebAudio. The eagle cry, train horn and crossing
+// bell are real recordings (js/sounds.js); everything else is synthesized, and
+// any recording that is missing falls back to a synthesized stand-in.
 // Most world sounds take a `vol` (0..1) so they fade with distance from the chicken.
 var GameAudio = (function () {
   var ctx = null;
@@ -6,6 +8,54 @@ var GameAudio = (function () {
   var master = null;
   var noiseBuf = null;
   var amb = null;
+  var buffers = {};
+  var decoding = {};
+
+  function dataUriToBuffer(uri) {
+    var bin = atob(uri.slice(uri.indexOf(',') + 1));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  // Decode the embedded recordings once the audio context exists.
+  function loadSamples() {
+    if (!ctx || typeof SoundBank === 'undefined') return;
+    Object.keys(SoundBank).forEach(function (name) {
+      if (buffers[name] || decoding[name]) return;
+      decoding[name] = true;
+      try {
+        ctx.decodeAudioData(dataUriToBuffer(SoundBank[name]), function (b) { buffers[name] = b; }, function () { /* keep synth fallback */ });
+      } catch (e) { /* keep synth fallback */ }
+    });
+  }
+
+  // Play a recording. Returns false when it is not available (caller falls back
+  // to the synthesized version). opts: gain, rate, offset, dur (seconds), delay.
+  function sample(name, vol, opts) {
+    var c = ensureCtx();
+    if (!c || !buffers[name]) return false;
+    if (!enabled) return true;
+    opts = opts || {};
+    var v = (vol === undefined ? 1 : vol) * (opts.gain === undefined ? 1 : opts.gain);
+    if (v <= 0.01) return true;
+    var buf = buffers[name];
+    var offset = opts.offset || 0;
+    var dur = Math.min(opts.dur || buf.duration, buf.duration - offset);
+    var t0 = c.currentTime + (opts.delay || 0);
+    var src = c.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = opts.rate || 1;
+    var g = c.createGain();
+    var fade = Math.min(0.12, dur * 0.25);
+    g.gain.setValueAtTime(v, t0);
+    g.gain.setValueAtTime(v, t0 + Math.max(0, dur / (opts.rate || 1) - fade));
+    g.gain.linearRampToValueAtTime(0.0001, t0 + dur / (opts.rate || 1));
+    src.connect(g);
+    g.connect(master);
+    src.start(t0, offset, dur);
+    return true;
+  }
 
   function ensureCtx() {
     if (!ctx) {
@@ -15,6 +65,7 @@ var GameAudio = (function () {
         master = ctx.createGain();
         master.gain.value = 0.9;
         master.connect(ctx.destination);
+        loadSamples();
       }
     }
     if (ctx && ctx.state === 'suspended') ctx.resume();
@@ -128,6 +179,7 @@ var GameAudio = (function () {
     },
     isEnabled: function () { return enabled; },
     unlock: function () { ensureCtx(); },
+    sample: sample,
 
     // traffic: 1 while the chicken's lane (or the next) is a road; rain: weather intensity 0..1
     setAmbience: function (traffic, rain) {
@@ -184,6 +236,7 @@ var GameAudio = (function () {
 
     // ---- railway ----
     bell: function (alt, vol) {
+      if (sample('bell', vol, { gain: 0.8, rate: alt ? 1.05 : 1, dur: 0.5 })) return;
       var f = alt ? 1180 : 1000;
       tone(f, 0.2, 'sine', 0.09, { vol: vol, freqEnd: f * 0.98 });
       tone(f * 2.01, 0.14, 'sine', 0.04, { vol: vol });
@@ -191,6 +244,7 @@ var GameAudio = (function () {
     },
     // The warning whistle: a long "whoooo" then a shorter rising "wooo!"
     trainWhistle: function (vol) {
+      if (sample('horn', vol, { gain: 0.7, dur: 1.45 })) return;
       tone(587, 0.65, 'sawtooth', 0.06, { vol: vol, vibrato: 6, attack: 0.05, hold: 0.45 });
       tone(740, 0.65, 'square', 0.04, { vol: vol, vibrato: 6, attack: 0.05, hold: 0.45 });
       tone(587, 0.9, 'sawtooth', 0.065, { vol: vol, delay: 0.8, freqEnd: 640, vibrato: 6, attack: 0.05, hold: 0.7 });
@@ -198,11 +252,13 @@ var GameAudio = (function () {
       noise(1.5, 0.03, { vol: vol, filter: 'highpass', freq: 3000, delay: 0.05 });
     },
     trainToot: function (vol) {
+      if (sample('horn', vol, { gain: 0.6, offset: 0.1, dur: 0.8, rate: 1.05 })) return;
       tone(660, 0.35, 'sawtooth', 0.06, { vol: vol, attack: 0.03, hold: 0.2 });
       tone(830, 0.35, 'square', 0.04, { vol: vol, attack: 0.03, hold: 0.2 });
     },
     // The train thundering past: rumble plus rhythmic chugging.
     trainPass: function (vol) {
+      if (sample('pass', vol, { gain: 0.8 })) return;
       noise(2.4, 0.3, { vol: vol, freq: 260, freqEnd: 140, attack: 0.5 });
       for (var i = 0; i < 12; i++) {
         noise(0.12, 0.2, { vol: vol, freq: 700, freqEnd: 250, delay: 0.1 + i * 0.17 });
@@ -298,9 +354,44 @@ var GameAudio = (function () {
       tone(48, 2.6, 'sine', 0.2, { delay: delay + 0.1, freqEnd: 30, attack: 0.4 });
     },
 
+    // The eagle diving at you: the real cry again, a touch higher and louder.
+    eagleAttack: function () {
+      if (sample('eagle', 1, { gain: 1, rate: 1.12 })) return;
+      this.screech();
+    },
+    // the chicken's startled squawk as the talons close
+    squawk: function () {
+      tone(900, 0.16, 'square', 0.07, { freqEnd: 1500, vibrato: 30 });
+      tone(1250, 0.14, 'triangle', 0.05, { freqEnd: 700, delay: 0.1 });
+    },
+    // new hazards
+    slide: function () {
+      noise(0.18, 0.06, { filter: 'highpass', freq: 3800, freqEnd: 6500, attack: 0.02 });
+    },
+    fall: function () {
+      tone(700, 0.7, 'sine', 0.09, { freqEnd: 90 });
+      tone(520, 0.7, 'triangle', 0.05, { freqEnd: 60, delay: 0.05 });
+    },
+    chomp: function () {
+      noise(0.12, 0.3, { freq: 900, freqEnd: 200, attack: 0.002 });
+      tone(120, 0.18, 'square', 0.12, { freqEnd: 60 });
+      tone(90, 0.3, 'sawtooth', 0.1, { freqEnd: 40, delay: 0.08 });
+    },
+    crocGrowl: function (vol) {
+      tone(95, 0.45, 'sawtooth', 0.06, { vol: vol, freqEnd: 70, vibrato: 22, attack: 0.05 });
+      noise(0.3, 0.05, { vol: vol, freq: 500, freqEnd: 200, attack: 0.05 });
+    },
+    portal: function () {
+      [392, 523, 659, 880, 1175].forEach(function (f, i) {
+        tone(f, 0.4, 'sine', 0.05, { delay: i * 0.08 });
+        tone(f * 2, 0.3, 'triangle', 0.02, { delay: i * 0.08 });
+      });
+    },
+
     // The eagle's screech: three sharp, falling "kee-kee-kee" cries. It is the ONLY
     // warning you get that the eagle is coming (3 seconds before it arrives).
     eagleCry: function () {
+      if (sample('eagle', 1, { gain: 0.9 })) return;
       [0, 0.3, 0.6].forEach(function (d, i) {
         tone(2500 - i * 160, 0.26, 'sawtooth', 0.06, { freqEnd: 1500 - i * 90, vibrato: 20, delay: d, attack: 0.02 });
         tone(3300 - i * 200, 0.22, 'triangle', 0.035, { freqEnd: 2200, delay: d + 0.02 });

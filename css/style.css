@@ -89,6 +89,7 @@ button { font-family: var(--body-font); -webkit-appearance: none; appearance: no
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
 }
 .best-box .trophy { font-size: 15px; }
+.best-box .best-mode { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: rgba(255, 255, 255, 0.2); }
 
 .coin-box {
   display: flex; align-items: center; gap: 8px;
@@ -897,7 +898,26 @@ html[data-title-font="pixel"] .go-row #restartBtn { font-size: 11px; }
 .set-tabs { grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .set-tab { font-size: 10px; padding: 6px 1px 5px; }
 .set-tab .ti { font-size: 18px; }
-.diff-row .diff-btn { flex: 1 1 calc(50% - 4px); }
+.diff-row .diff-btn { flex: 1 1 calc(50% - 4px); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.diff-btn .diff-best { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.7; }
+/* share card */
+.share-card { max-width: 440px; }
+.share-img {
+  width: 100%; max-height: 52vh; object-fit: contain; display: block;
+  border-radius: 16px; border: 3px solid var(--ink); background: #1b1450;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
+}
+.share-actions { display: flex; gap: 8px; width: 100%; }
+.share-actions .share-act {
+  flex: 1 1 0; min-width: 0; margin: 0; padding: 11px 8px; font-size: 15px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: linear-gradient(#5fd46a, #36a843); box-shadow: 0 5px 0 #23782c;
+}
+.share-actions .share-act.alt { background: linear-gradient(#5aa8ff, #3a78e0); box-shadow: 0 5px 0 #254fa0; }
+.share-actions .share-act:active { transform: translateY(4px); box-shadow: 0 1px 0 #23782c; }
+.close-btn.back { background: linear-gradient(#ff6b6f, #e0393f); }
+.go-mode { margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.15em; color: #7d9a6c; }
+.go-mode b { font-family: inherit; font-size: inherit; color: var(--ink); -webkit-text-stroke: 0; text-shadow: none; margin: 0; }
 
 /* narrow phones: keep the home content clear of the score / TOP chip in the top-left corner */
 @media (max-width: 480px) { #startPanel { padding-top: calc(84px + var(--safe-t)); } }

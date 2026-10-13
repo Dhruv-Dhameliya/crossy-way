@@ -1,8 +1,9 @@
 // Procedural canvas textures for the lane surfaces. Lane dashes, rail
 // sleepers, grass grain and water ripples are painted into small tileable
 // textures shared by every row of that kind, so a lane is a single mesh.
+// Every biome (forest, space...) has its own palette; a lane can also be a
+// variant: frozen "ice" (a grass lane) or a dark "void" (a water-type lane).
 var Textures = (function () {
-  var textureCache = {};
   var materialCache = {};
   var geometryCache = {};
   var waterTextures = [];
@@ -38,19 +39,36 @@ var Textures = (function () {
     }
   }
 
-  function grassTexture(base) {
+  // moon = true: add little craters
+  function grassTexture(base, moon) {
     return makeTexture(64, 64, function (ctx, w, h) {
       ctx.fillStyle = hexCss(base);
       ctx.fillRect(0, 0, w, h);
       speckle(ctx, w, h, base, 26, 11 + (base & 255), 0.07);
+      if (moon) {
+        var r = rng(5 + (base & 255));
+        for (var i = 0; i < 3; i++) {
+          var cx = 8 + r() * 48, cy = 8 + r() * 48, rad = 3 + r() * 4;
+          ctx.fillStyle = shadeCss(base, -0.16);
+          ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = shadeCss(base, 0.1);
+          ctx.beginPath(); ctx.arc(cx - 1, cy - 1, rad * 0.6, 0, Math.PI * 2); ctx.fill();
+        }
+      }
     });
   }
 
-  function roadTexture(base, line, edge) {
+  // tech = true: panel seams like a space-station road
+  function roadTexture(base, line, edge, tech) {
     return makeTexture(128, 128, function (ctx, w, h) {
       ctx.fillStyle = hexCss(base);
       ctx.fillRect(0, 0, w, h);
       speckle(ctx, w, h, base, 50, 23 + (base & 255), 0.06);
+      if (tech) {
+        ctx.fillStyle = shadeCss(base, 0.12);
+        ctx.fillRect(0, 62, w, 2);
+        ctx.fillRect(63, 0, 2, h);
+      }
       if (edge) {
         // dashed divider on the near edge of the lane (shared with the lane in front)
         ctx.fillStyle = hexCss(line);
@@ -72,16 +90,19 @@ var Textures = (function () {
     });
   }
 
-  function waterTexture(base) {
+  // accent: colour of the little glints / streaks
+  function waterTexture(base, accent) {
     var tex = makeTexture(128, 128, function (ctx, w, h) {
       ctx.fillStyle = hexCss(base);
       ctx.fillRect(0, 0, w, h);
       var r = rng(7 + (base & 255));
-      ctx.fillStyle = shadeCss(base, 0.28);
+      ctx.fillStyle = accent === undefined ? shadeCss(base, 0.28) : hexCss(accent);
+      ctx.globalAlpha = accent === undefined ? 1 : 0.55;
       for (var i = 0; i < 7; i++) {
         var x = Math.floor(r() * 16) * 8, y = Math.floor(r() * 16) * 8;
         ctx.fillRect(x, y, 14 + Math.floor(r() * 4) * 6, 4);
       }
+      ctx.globalAlpha = 1;
       ctx.fillStyle = shadeCss(base, -0.1);
       for (var j = 0; j < 5; j++) {
         ctx.fillRect(Math.floor(r() * 16) * 8, Math.floor(r() * 16) * 8, 10 + Math.floor(r() * 3) * 6, 3);
@@ -89,6 +110,24 @@ var Textures = (function () {
     });
     waterTextures.push(tex);
     return tex;
+  }
+
+  // frozen ground: pale glassy streaks and hairline cracks
+  function iceTexture(base) {
+    return makeTexture(64, 64, function (ctx, w, h) {
+      ctx.fillStyle = hexCss(base);
+      ctx.fillRect(0, 0, w, h);
+      var r = rng(13 + (base & 255));
+      ctx.fillStyle = shadeCss(base, 0.5);
+      for (var i = 0; i < 4; i++) ctx.fillRect(Math.floor(r() * 12) * 4, Math.floor(r() * 16) * 4, 10 + Math.floor(r() * 4) * 4, 3);
+      ctx.strokeStyle = shadeCss(base, -0.18);
+      ctx.lineWidth = 1;
+      for (var j = 0; j < 3; j++) {
+        ctx.beginPath();
+        var x = r() * w, y = r() * h;
+        ctx.moveTo(x, y); ctx.lineTo(x + (r() - 0.5) * 22, y + (r() - 0.5) * 22); ctx.stroke();
+      }
+    });
   }
 
   function sideMat(color) {
@@ -114,22 +153,33 @@ var Textures = (function () {
   }
 
   // BoxGeometry material order: +x, -x, +y, -y, +z, -z
-  function getGroundMaterials(type, parity, edge) {
-    var key = 'mat:' + type + ':' + parity + ':' + (edge ? 1 : 0);
+  // variant: undefined | 'ice' (on a grass lane) | 'void' (on a water-type lane)
+  function getGroundMaterials(type, parity, edge, biome, variant) {
+    biome = biome || 'forest';
+    var key = 'mat:' + biome + ':' + type + ':' + parity + ':' + (edge ? 1 : 0) + ':' + (variant || '');
     if (materialCache[key]) return materialCache[key];
-    var C = CONFIG.COLORS;
+    var C = Biome.colors(biome);
+    var space = biome === 'space';
     var tiles = CONFIG.GROUND_VISUAL_HALF * 2 + 1;
     var tex, side;
-    if (type === CONFIG.ROW_TYPES.GRASS) {
-      tex = grassTexture(parity ? C.grassA : C.grassB);
+    if (type === CONFIG.ROW_TYPES.GRASS && variant === 'ice') {
+      tex = iceTexture(parity ? C.iceA : C.iceB);
+      tex.repeat.set(tiles, 1);
+      side = C.iceSide;
+    } else if (type === CONFIG.ROW_TYPES.GRASS) {
+      tex = grassTexture(parity ? C.grassA : C.grassB, space);
       tex.repeat.set(tiles, 1);
       side = C.grassSide;
     } else if (type === CONFIG.ROW_TYPES.ROAD) {
-      tex = roadTexture(parity ? C.roadA : C.roadB, C.roadLine, edge);
+      tex = roadTexture(parity ? C.roadA : C.roadB, C.roadLine, edge, space);
       tex.repeat.set(tiles / 2, 1);
       side = C.roadSide;
+    } else if (type === CONFIG.ROW_TYPES.WATER && variant === 'void') {
+      tex = waterTexture(parity ? C.voidA : C.voidB, C.voidAccent);
+      tex.repeat.set(tiles / 2, 1);
+      side = C.voidSide;
     } else if (type === CONFIG.ROW_TYPES.WATER) {
-      tex = waterTexture(parity ? C.waterA : C.waterB);
+      tex = waterTexture(parity ? C.waterA : C.waterB, space ? C.waterAccent : undefined);
       tex.repeat.set(tiles / 2, 1);
       side = C.waterSide;
     } else {

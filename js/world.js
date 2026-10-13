@@ -1,5 +1,7 @@
 // Procedural endless world: bands of grass / road / river / railway lanes with
-// their trees, traffic, logs, lily pads, trains and coins.
+// their trees, traffic, logs, lily pads, trains and coins. Every row belongs to a
+// biome (forest, space...) that only changes how it looks. Extra hazards: sliding
+// ice lanes, crocodile logs and moving platforms over a chasm.
 function World(scene) {
   this.scene = scene;
   this.rows = new Map(); // z -> row data
@@ -36,6 +38,8 @@ World.prototype.nextBand = function (z) {
     band = { type: T.GRASS, left: Utils.weightedChoice([
       { value: 1, weight: 0.38 }, { value: 2, weight: 0.34 }, { value: 3, weight: 0.2 }, { value: 4, weight: 0.08 }
     ]) };
+    // slippery ice patch: needs a couple of rows to be worth sliding on
+    band.ice = z > 12 && band.left >= 2 && Math.random() < 0.17 * Difficulty.cur.special;
   } else {
     var options = [
       { value: T.ROAD, weight: 0.5 },
@@ -58,6 +62,11 @@ World.prototype.nextBand = function (z) {
     };
     // some rivers are full of turtles that dive now and then
     band.turtles = type === T.WATER && !band.pads && z > 22 && Math.random() < 0.26 * Difficulty.cur.special;
+    var plainRiver = type === T.WATER && !band.pads && !band.turtles;
+    // crocodile logs, and a chasm crossed on moving platforms
+    band.crocs = plainRiver && z > 16 && Math.random() < 0.26 * Difficulty.cur.special;
+    band.voidLane = plainRiver && !band.crocs && z > 26 && Math.random() < 0.22 * Difficulty.cur.special;
+    if (band.voidLane) band.left = Math.min(band.left, 2);
   }
   this.band = band;
 };
@@ -108,19 +117,31 @@ World.prototype.generateRow = function (z) {
   this.group.add(group);
 
   var top = CONFIG.ROW_TOP[type];
-  var ground = new THREE.Mesh(Textures.getGroundGeometry(type), Textures.getGroundMaterials(type, parity, edge));
+  var biome = Biome.forRow(z);
+  var variant = type === T.GRASS && band.ice ? 'ice' : type === T.WATER && band.voidLane ? 'void' : undefined;
+  var ground = new THREE.Mesh(Textures.getGroundGeometry(type), Textures.getGroundMaterials(type, parity, edge, biome, variant));
   ground.position.y = (top + CONFIG.ROW_BOTTOM) / 2;
   ground.receiveShadow = true;
   group.add(ground);
 
-  var row = { z: z, type: type, top: top, group: group, blocked: {}, small: {}, vehicles: [], logs: [], coins: [], items: [], train: null };
+  var row = {
+    z: z, type: type, top: top, group: group, blocked: {}, small: {}, vehicles: [], logs: [], coins: [], items: [], train: null,
+    biome: biome, ice: variant === 'ice', void: variant === 'void'
+  };
+  if (z > 0 && Biome.mode === 'auto' && Biome.forRow(z - 1) !== biome) {
+    // the world changes here: a pair of gate pillars marks the border
+    var gate = Models.buildGate(biome);
+    gate.position.y = top;
+    group.add(gate);
+    row.gate = true;
+  }
 
   var dir = band.dir || 1;
   if (type !== T.GRASS && type !== T.RAIL) band.dir = Math.random() < 0.85 ? -dir : dir;
 
   if (type === T.GRASS) this.populateGrass(row, z, p);
   else if (type === T.ROAD) this.populateRoad(row, dir, p);
-  else if (type === T.WATER) this.populateWater(row, dir, p, band.pads, band.turtles);
+  else if (type === T.WATER) this.populateWater(row, dir, p, band);
   else this.populateRail(row);
 
   this.rows.set(z, row);
@@ -153,15 +174,15 @@ World.prototype.populateGrass = function (row, z, p) {
   var x;
   for (x = -PH; x <= PH; x++) {
     if (forbid[x]) {
-      if (Math.random() < 0.06) Models.flowerBoxes(boxes, x, 0);
+      if (Math.random() < 0.06) Models.flowerBoxes(boxes, x, 0, row.biome);
       continue;
     }
     if (Math.random() < density) {
-      var kind = Models.obstacleBoxes(boxes, x, 0); // tree, rock, bush, hay bale, fence, scarecrow, stump, barrels, sunflower, mushroom
+      var kind = Models.obstacleBoxes(boxes, x, 0, row.biome); // tree, rock, bush, hay bale, fence, scarecrow, stump, barrels, sunflower, mushroom (or their space twins)
       row.blocked[x] = true;
       if (Models.isSmallObstacle(kind)) row.small[x] = true; // the Jump power-up can hop over these
     } else if (Math.random() < 0.07) {
-      Models.flowerBoxes(boxes, x, 0);
+      Models.flowerBoxes(boxes, x, 0, row.biome);
     }
   }
 
@@ -172,9 +193,9 @@ World.prototype.populateGrass = function (row, z, p) {
     [-1, 1].forEach(function (side) {
       if (Math.random() < chance) {
         var kind = Math.random() < 0.65 ? Utils.choice([1, 1, 2, 2, 0]) : 3;
-        Models.treeBoxes(boxes, side * (PH + d), 0, kind);
+        Models.treeBoxes(boxes, side * (PH + d), 0, kind, row.biome);
       } else if (Math.random() < 0.15) {
-        Models.rockBoxes(boxes, side * (PH + d), 0);
+        Models.rockBoxes(boxes, side * (PH + d), 0, row.biome);
       }
     });
   }
@@ -305,7 +326,7 @@ World.prototype.populateRoad = function (row, dir, p) {
 };
 
 World.prototype.attachVehicleMesh = function (row, v) {
-  var mesh = Models.buildVehicle(v.kind);
+  var mesh = Models.buildVehicle(v.kind, row.biome);
   mesh.position.set(v.x, row.top, 0);
   mesh.rotation.y = row.dir > 0 ? 0 : Math.PI;
   row.group.add(mesh);
@@ -349,7 +370,7 @@ World.prototype.laneStep = function (row, dt) {
   var need = lead ? Math.max(row.wantGap, this.requiredGap(row, lead, cand)) : 0;
   if (gap0 >= need) {
     var v2 = {
-      kind: cand.kind, speed: cand.speed, cur: cand.speed, halfWidth: cand.len / 2,
+      kind: cand.kind, speed: cand.speed, cur: cand.speed, halfWidth: cand.len / 2, direction: dir,
       s: -cand.len / 2, x: 0, mesh: null, heard: 0, ph: Math.random() * 6.28
     };
     v2.x = dir > 0 ? v2.s - wrap : wrap - v2.s;
@@ -406,9 +427,10 @@ World.prototype.vehicleAudio = function (row) {
   }
 };
 
-World.prototype.populateWater = function (row, dir, p, pads, turtles) {
-  if (pads) return this.populatePads(row);
-  if (turtles) return this.populateTurtles(row, dir, p);
+World.prototype.populateWater = function (row, dir, p, band) {
+  if (band.pads) return this.populatePads(row);
+  if (band.turtles) return this.populateTurtles(row, dir, p);
+  if (band.voidLane) return this.populatePlatforms(row, p);
   var wrap = CONFIG.LANE_HALF;
   var loopLen = wrap * 2;
   var speed = Utils.randRange(1.1 + p * 1.2, 2.0 + p * 1.8) * Difficulty.cur.speed;
@@ -420,15 +442,57 @@ World.prototype.populateWater = function (row, dir, p, pads, turtles) {
   }
   var centers = layoutLoop(lengths, loopLen, 1.4);
   row.loop = { wrap: wrap, len: loopLen };
+  // crocodile rivers: some of the longer logs are crocodiles
+  var crocLeft = band.crocs ? Utils.randInt(2, 3) : 0;
   for (var j = 0; j < centers.length; j++) {
-    var mesh = Models.buildLog(lengths[j]);
-    mesh.position.set(centers[j], -0.12, 0);
+    var entry;
+    if (crocLeft > 0 && lengths[j] >= 3) {
+      crocLeft--;
+      var croc = Models.buildCroc(lengths[j], row.biome);
+      croc.group.position.set(centers[j], -0.12, 0);
+      croc.group.rotation.y = dir > 0 ? 0 : Math.PI;
+      row.group.add(croc.group);
+      var cyc = Utils.randRange(3.4, 4.6);
+      entry = {
+        mesh: croc.group, x: centers[j], halfWidth: lengths[j] / 2, speed: speed, direction: dir,
+        baseY: -0.12, top: 0.05, dip: 0, bob: 0, phase: Math.random() * 6.28,
+        croc: true, jaw: croc.jaw, cycle: cyc, t0: Utils.randRange(0, cyc), open: 0, snapped: false
+      };
+    } else {
+      var mesh = Models.buildLog(lengths[j], row.biome);
+      mesh.position.set(centers[j], -0.12, 0);
+      row.group.add(mesh);
+      entry = {
+        mesh: mesh, x: centers[j], halfWidth: lengths[j] / 2, speed: speed, direction: dir,
+        baseY: -0.12, top: 0.05, dip: 0, bob: 0, phase: Math.random() * 6.28
+      };
+    }
+    row.logs.push(entry);
+  }
+};
+
+// A chasm: nothing to stand on but a few platforms that slide back and forth.
+World.prototype.populatePlatforms = function (row, p) {
+  var PH = CONFIG.PLAY_HALF;
+  row.loop = null;
+  var n = 4;
+  var step = (PH * 2) / (n - 1);
+  var base = Utils.randRange(0.55, 0.8) + p * 0.25;
+  for (var i = 0; i < n; i++) {
+    var w = Utils.weightedChoice([{ value: 2, weight: 0.6 }, { value: 3, weight: 0.4 }]);
+    var cx = -PH + i * step + Utils.randRange(-0.3, 0.3);
+    var amp = Utils.randRange(1.5, 2.2);
+    var omega = base * Utils.randRange(0.85, 1.2) * Math.sqrt(Difficulty.cur.speed);
+    var mesh = Models.buildPlatform(w, row.biome);
+    mesh.position.set(cx, -0.12, 0);
     row.group.add(mesh);
     row.logs.push({
-      mesh: mesh, x: centers[j], halfWidth: lengths[j] / 2, speed: speed, direction: dir,
-      baseY: -0.12, top: 0.05, dip: 0, bob: 0, phase: Math.random() * 6.28
+      mesh: mesh, x: cx, halfWidth: w / 2, speed: 0, direction: 0, vx: 0,
+      baseY: -0.12, top: 0.05, dip: 0, bob: 0, phase: Math.random() * 6.28,
+      platform: true, sway: { cx: cx, amp: amp, w: omega, ph: Utils.randRange(0, 6.28) }
     });
   }
+  if (Math.random() < 0.25) this.placeCoin(row, false);
 };
 
 // Turtle river: groups of turtles paddle along, but every so often they
@@ -444,7 +508,7 @@ World.prototype.populateTurtles = function (row, dir, p) {
   row.loop = { wrap: wrap, len: loopLen };
   for (var j = 0; j < centers.length; j++) {
     var n = lengths[j];
-    var mesh = Models.buildTurtles(n);
+    var mesh = Models.buildTurtles(n, row.biome);
     mesh.position.set(centers[j], -0.12, 0);
     mesh.rotation.y = dir > 0 ? 0 : Math.PI;
     row.group.add(mesh);
@@ -472,7 +536,7 @@ World.prototype.populatePads = function (row) {
   row.loop = null;
   for (var c = -PH; c <= PH; c++) {
     if (!cols[c]) continue;
-    var mesh = Models.buildPad(Math.random() < 0.18);
+    var mesh = Models.buildPad(Math.random() < 0.18, row.biome);
     mesh.position.set(c, -0.2, 0);
     row.group.add(mesh);
     row.logs.push({
@@ -490,9 +554,10 @@ World.prototype.populatePads = function (row) {
 World.prototype.populateRail = function (row) {
   var PH = CONFIG.PLAY_HALF;
   var vh = CONFIG.GROUND_VISUAL_HALF;
+  var railColor = Biome.colors(row.biome).rail;
   row.group.add(Utils.voxelMesh([
-    { x: 0, y: row.top + 0.04, z: 0.28, w: vh * 2, h: 0.07, d: 0.07, color: CONFIG.COLORS.rail },
-    { x: 0, y: row.top + 0.04, z: -0.28, w: vh * 2, h: 0.07, d: 0.07, color: CONFIG.COLORS.rail }
+    { x: 0, y: row.top + 0.04, z: 0.28, w: vh * 2, h: 0.07, d: 0.07, color: railColor },
+    { x: 0, y: row.top + 0.04, z: -0.28, w: vh * 2, h: 0.07, d: 0.07, color: railColor }
   ], { castShadow: false }));
 
   var sig = Models.buildSignal();
@@ -538,7 +603,7 @@ World.prototype.spawnTrain = function (row) {
   var seg = Models.TRAIN_SEG;
   var segCount = Utils.randInt(5, 9);
   for (var i = 0; i < segCount; i++) {
-    var part = i === 0 ? Models.buildLocomotive() : Models.buildTrainCar();
+    var part = i === 0 ? Models.buildLocomotive(row.biome) : Models.buildTrainCar(row.biome);
     part.position.x = -i * seg;
     g.add(part);
   }
@@ -607,18 +672,26 @@ World.prototype.update = function (dt, centerZ, playerZ, budget) {
       var w2 = row.loop ? row.loop.wrap : 0, l2 = row.loop ? row.loop.len : 0;
       for (var j = 0; j < row.logs.length; j++) {
         var l = row.logs[j];
-        if (l.speed) {
+        if (l.sway) {
+          // ping-pong platform: the velocity is what carries the chicken along
+          var sw = l.sway;
+          l.x = sw.cx + sw.amp * Math.sin(time * sw.w + sw.ph);
+          l.vx = sw.amp * sw.w * Math.cos(time * sw.w + sw.ph);
+          l.mesh.position.x = l.x;
+        } else if (l.speed) {
           l.x += l.direction * l.speed * dt;
           if (l.x > w2) l.x -= l2;
           else if (l.x < -w2) l.x += l2;
           l.mesh.position.x = l.x;
-        }
+          l.vx = l.direction * l.speed;
+        } else l.vx = 0;
         l.dip += (0 - l.dip) * (1 - Math.exp(-dt * 9));
         l.bob = Math.sin(time * 2.1 + l.phase) * 0.018;
         if (l.turtle) self.updateTurtle(row, l, dt, time);
+        else if (l.croc) self.updateCroc(row, l, dt, time, vol);
         l.mesh.position.y = l.baseY + l.bob - l.dip - (l.sink || 0) + (l.wob || 0);
         l.curTop = l.top + l.bob - l.dip - (l.sink || 0) + (l.wob || 0); // what the chicken stands on
-        if (l.pad || l.turtle) l.mesh.rotation.z = Math.sin(time * 1.6 + l.phase) * 0.02;
+        if (l.pad || l.turtle || l.platform) l.mesh.rotation.z = Math.sin(time * 1.6 + l.phase) * 0.02;
       }
     } else if (row.type === T.RAIL) {
       self.updateTrain(row, dt, vol);
@@ -642,6 +715,47 @@ World.prototype.updateTurtle = function (row, l, dt, time) {
     l.bubbled = true;
     Particles.burst(l.x, row.top + 0.02, row.z, { colors: [0xffffff, 0xcfeeff, 0x9be0ff], count: 8, speed: 1.4, up: 2.2, size: 0.09, life: 0.6, gravity: 2, spread: l.halfWidth, floor: row.top });
   } else if (tt < warnStart) l.bubbled = false;
+};
+
+// A crocodile: it dozes, opens its mouth a little (warning), then SNAPS. The head
+// is only dangerous while the mouth is wide open.
+World.prototype.updateCroc = function (row, l, dt, time, vol) {
+  var tt = (time + l.t0) % l.cycle;
+  var warn = l.cycle - 1.7, snap = l.cycle - 0.95, shut = l.cycle - 0.3;
+  var target = 0;
+  if (l.chomp > 0) { l.chomp -= dt; target = 0; }               // just ate the chicken: jaws clamp shut
+  else if (tt >= warn && tt < snap) target = 0.32 + (tt - warn) / (snap - warn) * 0.18;
+  else if (tt >= snap && tt < shut) target = 1;
+  l.open += (target - l.open) * (1 - Math.exp(-dt * (target === 0 && l.chomp > 0 ? 30 : 13)));
+  l.jaw.rotation.z = -l.open * 0.78;
+  if (tt >= snap && tt < shut && !l.snapped) {
+    l.snapped = true;
+    if (vol > 0 && GameAudio && GameAudio.crocGrowl) GameAudio.crocGrowl(vol);
+  } else if (tt < warn) l.snapped = false;
+};
+
+// The croc's dangerous head, if the chicken at (x, z) is standing in its open mouth.
+World.prototype.checkCrocHit = function (x, z) {
+  var row = this.rows.get(z);
+  if (!row || row.type !== CONFIG.ROW_TYPES.WATER) return null;
+  for (var i = 0; i < row.logs.length; i++) {
+    var l = row.logs[i];
+    if (!l.croc || l.open < 0.62) continue;
+    var headX = l.x + l.direction * (l.halfWidth - Models.CROC_HEAD / 2);
+    if (Math.abs(x - headX) < Models.CROC_HEAD / 2 + 0.12) return l;
+  }
+  return null;
+};
+
+// What happens to a chicken that ends up in this water lane: drown, or fall into the chasm.
+World.prototype.drownType = function (z) {
+  var row = this.rows.get(z);
+  return row && row.void ? 'fall' : 'drown';
+};
+
+World.prototype.isIce = function (x, z) {
+  var row = this.rows.get(z);
+  return !!row && row.ice;
 };
 
 // Magnet: coins near the player fly in, and are collected on arrival.

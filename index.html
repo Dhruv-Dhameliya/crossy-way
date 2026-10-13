@@ -30,7 +30,7 @@
   <div id="hud">
     <div class="hud-left">
       <div id="score">0</div>
-      <div class="best-box"><span class="trophy">🏆</span> TOP <span id="bestScore">0</span></div>
+      <div class="best-box"><span class="trophy">🏆</span><span id="bestMode" class="best-mode">⚡ MEDIUM</span> TOP <span id="bestScore">0</span></div>
       <div id="combo" class="combo hidden">
         <div class="combo-row"><b id="comboMult">x1</b><span id="comboCount">0 hops</span></div>
         <div class="combo-bar"><i id="comboBar"></i></div>
@@ -94,12 +94,27 @@
       <div class="go-score">
         <small>SCORE</small>
         <b id="finalScore">0</b>
+        <div class="go-mode"><span id="goMode">⚡ MEDIUM</span> · TOP <b id="goBest">0</b></div>
       </div>
       <div class="go-row">
         <button id="shareBtn" class="share-btn"><span class="gi">⤴</span><span>SHARE</span></button>
         <button id="restartBtn"><span class="gi">▶</span><span>PLAY AGAIN</span></button>
         <button id="homeBtn" class="home-btn"><span class="gi">🏠</span><span>HOME</span></button>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== SHARE CARD ===== -->
+  <div id="sharePanel" class="panel modal hidden">
+    <div class="set-card share-card">
+      <h2>SHARE YOUR SCORE</h2>
+      <img id="shareImg" class="share-img" alt="Your Crossy Way score card" />
+      <div class="share-actions">
+        <button id="shareNativeBtn" class="close-btn share-act"><span class="gi">⤴</span> <span>SHARE</span></button>
+        <button id="shareSaveBtn" class="close-btn share-act alt"><span class="gi">⬇</span> <span>SAVE</span></button>
+        <button id="shareCopyBtn" class="close-btn share-act alt"><span class="gi">📋</span> <span>COPY</span></button>
+      </div>
+      <button id="closeShareBtn" class="close-btn back">◀ BACK</button>
     </div>
   </div>
 
@@ -159,6 +174,10 @@
       <ul class="info-list">
         <li>🚦 <b>Train signals:</b> <span class="sig green"></span> green = the track is clear, <span class="sig red"></span> flashing red = a train is about to come.</li>
         <li>🐢 <b>Turtles</b> shake, then dive. Hop off before they go under!</li>
+        <li>🐊 <b>Crocodile logs:</b> the back is safe, but the head snaps shut. Stay away when the mouth opens!</li>
+        <li>🧊 <b>Ice:</b> you keep sliding a little after you land. Plan your next hop.</li>
+        <li>🪨 <b>Chasms:</b> only moving platforms cross them. Time your hop, don't fall in.</li>
+        <li>🚀 <b>Space:</b> run far enough and the world turns into space. Crystals, crates and radar dishes block the way; hover cars and maglev trains replace the traffic. Pick a biome in Settings → World.</li>
         <li>🦅 <b>The eagle:</b> if you stand still you'll hear it screech. 3 seconds later it grabs you.</li>
         <li>🚑 Special vehicles: ambulances, ice-cream trucks, tractors, motorbikes and fast sports cars.</li>
         <li>🌲 Hay bales, fences, scarecrows, barrels and more block your way.</li>
@@ -185,10 +204,10 @@
         <div class="setting-group">
           <div class="setting-label">Difficulty</div>
           <div class="option-row diff-row">
-            <button class="option-btn diff-btn" data-diff="easy">🌱 Easy</button>
-            <button class="option-btn diff-btn" data-diff="medium">⚡ Medium</button>
-            <button class="option-btn diff-btn" data-diff="hard">🔥 Hard</button>
-            <button class="option-btn diff-btn" data-diff="extreme">💀 Extreme</button>
+            <button class="option-btn diff-btn" data-diff="easy"><span>🌱 Easy</span><small class="diff-best" data-best="easy">TOP 0</small></button>
+            <button class="option-btn diff-btn" data-diff="medium"><span>⚡ Medium</span><small class="diff-best" data-best="medium">TOP 0</small></button>
+            <button class="option-btn diff-btn" data-diff="hard"><span>🔥 Hard</span><small class="diff-best" data-best="hard">TOP 0</small></button>
+            <button class="option-btn diff-btn" data-diff="extreme"><span>💀 Extreme</span><small class="diff-best" data-best="extreme">TOP 0</small></button>
           </div>
           <p id="diffNote" class="setting-note"></p>
           <p class="setting-note">Each difficulty keeps its own top score. Harder modes mean faster traffic, busier roads, more trains and a quicker eagle.</p>
@@ -253,7 +272,16 @@
             <button class="option-btn wx-btn" data-wx="rain">🌧️ Rain</button>
             <button class="option-btn wx-btn" data-wx="fog">🌫️ Fog</button>
           </div>
-          <p class="setting-note">Auto changes the time of day and the weather as you run.</p>
+          <p class="setting-note">Auto changes the time of day and the weather as you run. In Space, rain becomes a meteor shower.</p>
+        </div>
+        <div class="setting-group">
+          <div class="setting-label">Biome</div>
+          <div class="option-row">
+            <button class="option-btn biome-btn" data-biome="auto">🔄 Auto</button>
+            <button class="option-btn biome-btn" data-biome="forest">🌲 Forest</button>
+            <button class="option-btn biome-btn" data-biome="space">🚀 Space</button>
+          </div>
+          <p class="setting-note">Same game, new look. Auto flies from the Forest into Space and back as you run; the other two lock one world in.</p>
         </div>
       </div>
 
@@ -315,6 +343,7 @@
   <script src="js/vendor/BufferGeometryUtils.js"></script>
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
+  <script src="js/sounds.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/cosmetics.js"></script>
   <script src="js/missions.js"></script>
@@ -322,6 +351,7 @@
   <script src="js/weather.js"></script>
   <script src="js/textures.js"></script>
   <script src="js/models.js"></script>
+  <script src="js/models_space.js"></script>
   <script src="js/particles.js"></script>
   <script src="js/world.js"></script>
   <script src="js/player.js"></script>

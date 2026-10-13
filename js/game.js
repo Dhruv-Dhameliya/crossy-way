@@ -21,6 +21,9 @@
   var idleTimer = 0;      // seconds since the chicken last reached a new row
   var shakeT = 0;
   var eagleCried = false;   // the eagle's screech has been played for this idle spell
+  var curBiome = 'forest';  // biome of the row the chicken stands on (sky, helmet, music follow it)
+  var shareBlob = null, shareUrl = null;
+  var bdMix = 0, bdSpace = new THREE.Color(CONFIG.BIOME_COLORS.space.backdrop);
   var camKick = 0;          // little camera dip on every landing
   var tmpV = new THREE.Vector3();
   var startCam = { x: 0, z: CONFIG.CAMERA_LEAD }; // title-screen view (chicken parked in free screen space)
@@ -42,12 +45,13 @@
   var IS_TOUCH = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
   var el = {};
-  ['score', 'coins', 'bestScore', 'powerups', 'toast', 'flash', 'freezeFx', 'startPanel', 'modeBtn', 'infoBtn', 'infoPanel', 'closeInfoBtn', 'diffNote', 'goTitle', 'homeBtn',
+  ['score', 'coins', 'bestScore', 'powerups', 'toast', 'flash', 'freezeFx', 'startPanel', 'modeBtn', 'infoBtn', 'infoPanel', 'closeInfoBtn', 'diffNote', 'bestMode', 'goMode', 'goBest', 'goTitle', 'homeBtn',
     'playBtn', 'gameOverPanel', 'finalScore', 'confetti',
     'restartBtn', 'shareBtn', 'fullscreenBtn', 'settingsBtn', 'pauseBtn', 'settingsPanel', 'closeSettingsBtn', 'dpad',
     'startHint', 'combo', 'comboMult', 'comboCount', 'comboBar', 'pops', 'wxBadge', 'heroChick',
     'startShopBtn', 'startMissionsBtn', 'missionDot',
     'shopPanel', 'shopCoins', 'shopPreview', 'shopLook', 'shopGrid', 'shopHint', 'closeShopBtn',
+    'sharePanel', 'shareImg', 'shareNativeBtn', 'shareSaveBtn', 'shareCopyBtn', 'closeShareBtn',
     'missionsPanel', 'missionsBody', 'closeMissionsBtn', 'musicSlider', 'musicPct', 'dpadSizeSlider', 'dpadSizePct', 'dpadSizeReset']
     .forEach(function (id) { el[id] = document.getElementById(id); });
   el.leanButtons = document.querySelectorAll('.lean-btn');
@@ -56,6 +60,7 @@
   el.qualityButtons = document.querySelectorAll('.quality-btn');
   el.todButtons = document.querySelectorAll('.tod-btn');
   el.wxButtons = document.querySelectorAll('.wx-btn');
+  el.biomeButtons = document.querySelectorAll('.biome-btn');
   el.shopTabs = document.querySelectorAll('.shop-tab');
   el.dpadButtons = document.querySelectorAll('.dpad-btn');
   el.dpadOptButtons = document.querySelectorAll('.dpad-opt');
@@ -221,6 +226,10 @@
     player.onItem = onItemCollected;
     player.onDeath = onPlayerDeath;
     player.onLand = function () { camKick = 0.05; };
+    player.onEagleGrab = function () {
+      shakeT = 0.4; vibrate([30, 40, 60]);
+      el.flash.classList.remove('on'); void el.flash.offsetWidth; el.flash.classList.add('on');
+    };
     player.onShieldPop = function () {
       if (GameAudio) GameAudio.pop();
       vibrate(30);
@@ -256,13 +265,14 @@
     applySwipe(swipeStyle);
     showSection(localStorage.getItem(CONFIG.TAB_KEY) || 'game');
     applyDifficulty(Difficulty.mode, true);
+    applyBiome(Biome.mode, true);
+    syncBiome(true);
     applyTod(Weather.timeMode());
     applyWx(Weather.weatherMode());
     setMusicUi(Music.getVolume());
     if (!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) {
       el.fullscreenBtn.classList.add('hidden');
     }
-    if (!(navigator.share || (navigator.clipboard && navigator.clipboard.writeText))) el.shareBtn.classList.add('hidden');
     document.body.classList.add(IS_TOUCH ? 'touch' : 'no-touch');
 
     el.heroChick.innerHTML = Cosmetics.svg();
@@ -481,7 +491,14 @@
     el.playBtn.addEventListener('click', function () { attemptMove(0, 1); });
     el.restartBtn.addEventListener('click', function () { restart(true); }); // play again: skip the home screen
     el.homeBtn.addEventListener('click', function () { restart(false); });
-    el.shareBtn.addEventListener('click', shareScore);
+    el.shareBtn.addEventListener('click', openShare);
+    el.closeShareBtn.addEventListener('click', closeShare);
+    el.shareNativeBtn.addEventListener('click', shareNative);
+    el.shareSaveBtn.addEventListener('click', saveShareImage);
+    el.shareCopyBtn.addEventListener('click', copyShare);
+    el.biomeButtons.forEach(function (b) {
+      b.addEventListener('click', function () { applyBiome(b.getAttribute('data-biome')); });
+    });
     el.fullscreenBtn.addEventListener('click', function () {
       var d = document.documentElement;
       if (!document.fullscreenElement && !document.webkitFullscreenElement) {
@@ -673,10 +690,23 @@
   function bestKey() {
     return Difficulty.mode === 'medium' ? CONFIG.BEST_SCORE_KEY : CONFIG.BEST_SCORE_KEY + '_' + Difficulty.mode;
   }
-  function readBest() {
+  function readBest(mode) {
     var v = 0;
-    try { v = parseInt(localStorage.getItem(bestKey()) || '0', 10) || 0; } catch (e) { /* private mode */ }
+    var key = !mode ? bestKey() : (mode === 'medium' ? CONFIG.BEST_SCORE_KEY : CONFIG.BEST_SCORE_KEY + '_' + mode);
+    try { v = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) { /* private mode */ }
     return v;
+  }
+  // Top score of every difficulty, shown on the difficulty buttons and the HUD chip.
+  function refreshBests() {
+    var D = Difficulty.cur;
+    el.bestScore.textContent = bestScore;
+    el.bestMode.textContent = D.icon + ' ' + D.label.toUpperCase();
+    el.goMode.textContent = D.icon + ' ' + D.label.toUpperCase();
+    el.goBest.textContent = bestScore;
+    el.diffButtons.forEach(function (b) {
+      var m = b.getAttribute('data-diff');
+      b.querySelector('.diff-best').textContent = 'TOP ' + (m === Difficulty.mode ? bestScore : readBest(m));
+    });
   }
 
   function applyDifficulty(mode, silent) {
@@ -689,7 +719,7 @@
     el.modeBtn.textContent = D.icon + ' ' + D.label.toUpperCase();
     el.modeBtn.setAttribute('data-mode', mode);
     bestScore = readBest();
-    el.bestScore.textContent = bestScore;
+    refreshBests();
     // the road ahead is built for the new difficulty (mid-run it applies to rows built from now on)
     if (!silent && state === 'start') rebuildWorld();
   }
@@ -699,6 +729,34 @@
     world = new World(scene);
     hookWorld();
     world.update(0, camZ, 0);
+    syncBiome(true);
+    previewWeather();
+  }
+
+  // Auto walks Forest -> Space -> Forest...; the others lock one biome in.
+  function applyBiome(mode, silent) {
+    if (mode !== 'forest' && mode !== 'space') mode = 'auto';
+    Biome.mode = mode;
+    try { localStorage.setItem(CONFIG.BIOME_KEY, mode); } catch (e) { /* private mode */ }
+    el.biomeButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-biome') === mode); });
+    if (!silent && state === 'start') rebuildWorld();
+  }
+
+  // The sky, the astronaut helmet and the music follow the biome under the chicken's feet.
+  function syncBiome(snap) {
+    if (!world || !player) return;
+    var z = Math.round(player.z);
+    var row = world.getRow(z);
+    var b = row ? row.biome : Biome.forRow(z);
+    if (b === curBiome && !snap) return;
+    var changed = b !== curBiome;
+    curBiome = b;
+    Weather.setBiome(b, snap);
+    player.setSuit(b === 'space');
+    if (changed && !snap && state === 'playing') {
+      showToast(b === 'space' ? '🚀 WELCOME TO SPACE!' : '🌲 BACK ON EARTH!', b === 'space' ? '#8f6bff' : '#3fb04c');
+      if (GameAudio) GameAudio.portal();
+    }
   }
 
   function applyTod(mode) {
@@ -1139,7 +1197,8 @@
   function onPlayerDeath(type) {
     lastDeath = type;
     if (type === 'car' || type === 'train') { shakeT = 0.32; vibrate(70); }
-    else if (type === 'drown') { shakeT = 0.12; vibrate(40); }
+    else if (type === 'drown' || type === 'fall') { shakeT = 0.12; vibrate(40); }
+    else if (type === 'croc') { shakeT = 0.25; vibrate(60); }
     else vibrate(50);
     resetCombo();
     Music.duck(0.2, 2.2);
@@ -1147,7 +1206,8 @@
 
   var CAUSES = {
     car: 'Squashed by traffic!', train: 'Choo-choo! Hit by a train!',
-    drown: 'Splash! Took a swim…', eagle: 'Snatched by the eagle!'
+    drown: 'Splash! Took a swim…', eagle: 'Snatched by the eagle!',
+    croc: 'Chomp! Eaten by a crocodile!', fall: 'Fell into the void!'
   };
 
   function animateNumber(node, to, ms) {
@@ -1186,6 +1246,7 @@
       try { localStorage.setItem(bestKey(), String(bestScore)); } catch (e) { /* private mode */ }
     }
     var record = isBest && score > 0;
+    refreshBests();
     el.goTitle.textContent = record ? '🏆 NEW TOP SCORE!' : 'GAME OVER';
     el.gameOverPanel.classList.toggle('is-record', record);
     refreshHud();
@@ -1200,16 +1261,252 @@
     }, 250);
   }
 
-  function shareScore() {
-    var text = 'I scored ' + score + ' on ' + Difficulty.cur.label + ' in Crossy Way! Can you beat me?';
-    if (navigator.share) {
-      navigator.share({ title: 'Crossy Way', text: text, url: location.href }).catch(function () { /* cancelled */ });
-    } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text + ' ' + location.href).then(function () {
-        var label = el.shareBtn.querySelector('span:last-child');
-        label.textContent = 'COPIED!';
-        setTimeout(function () { label.textContent = 'SHARE'; }, 1600);
+  // ---- share card ------------------------------------------------------------
+  // The share button makes a picture: a snapshot of the final scene, the score,
+  // the mode and the biome, ready for a post. It can be shared, saved or copied.
+  var BIOME_LABEL = { forest: '🌲 FOREST', space: '🚀 SPACE' };
+
+  function shareText() {
+    return 'I scored ' + score + ' on ' + Difficulty.cur.label + ' in Crossy Way! Can you beat me?';
+  }
+
+  function snapshotScene() {
+    renderer.render(scene, camera);          // draw right now so the canvas can be read back
+    var src = renderer.domElement, sw = src.width, sh = src.height;
+    var OW = 960, OH = 540, aspect = OW / OH;
+    var ch = Math.min(sh, sw / aspect) * 0.8, cw = ch * aspect;
+    if (cw > sw) { cw = sw; ch = cw / aspect; }
+    var p = new THREE.Vector3(player.x, 0.5, player.z).project(camera);
+    var px = (p.x * 0.5 + 0.5) * sw, py = (1 - (p.y * 0.5 + 0.5)) * sh;
+    var sx = Utils.clamp(px - cw / 2, 0, sw - cw), sy = Utils.clamp(py - ch / 2, 0, sh - ch);
+    var out = document.createElement('canvas');
+    out.width = OW; out.height = OH;
+    out.getContext('2d').drawImage(src, sx, sy, cw, ch, 0, 0, OW, OH);
+    return out;
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  function strokedText(c, text, x, y, fill, ink, lw) {
+    c.lineJoin = 'round';
+    c.lineWidth = lw; c.strokeStyle = ink; c.strokeText(text, x, y);
+    c.fillStyle = fill; c.fillText(text, x, y);
+  }
+
+  function loadChickenImage() {
+    return new Promise(function (resolve) {
+      try {
+        var svg = Cosmetics.svg();
+        if (svg.indexOf('xmlns') < 0) svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+        var img = new Image();
+        img.onload = function () { resolve(img); };
+        img.onerror = function () { resolve(null); };
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  function buildShareCard(snap) {
+    var fontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+    return Promise.all([fontsReady, loadChickenImage()]).then(function (res) {
+      var chick = res[1];
+      var W = 1080, H = 1350, INK = '#2b2b3a';
+      var cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      var c = cv.getContext('2d');
+      var space = curBiome === 'space';
+      var font = (getComputedStyle(document.documentElement).getPropertyValue('--title-font') || '').trim() || 'Arial, sans-serif';
+
+      // background
+      var g = c.createLinearGradient(0, 0, 0, H);
+      if (space) { g.addColorStop(0, '#1b1450'); g.addColorStop(0.55, '#2c2178'); g.addColorStop(1, '#0d0a2c'); }
+      else { g.addColorStop(0, '#8fd8ff'); g.addColorStop(0.5, '#c4efa0'); g.addColorStop(1, '#58b64a'); }
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+      var seed = 7;
+      function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+      if (space) {
+        for (var i = 0; i < 90; i++) {
+          c.globalAlpha = 0.3 + rnd() * 0.7;
+          c.fillStyle = rnd() < 0.2 ? '#8ff4ff' : '#ffffff';
+          var s = 3 + rnd() * 6;
+          c.fillRect(rnd() * W, rnd() * H, s, s);
+        }
+        c.globalAlpha = 0.25; c.fillStyle = '#8f6bff';
+        c.beginPath(); c.arc(W * 0.86, 120, 170, 0, 7); c.fill();
+        c.globalAlpha = 1;
+      } else {
+        c.globalAlpha = 0.5; c.fillStyle = '#ffffff';
+        [[120, 120, 150], [900, 90, 120], [520, 60, 90]].forEach(function (q) {
+          c.beginPath(); c.arc(q[0], q[1], q[2] * 0.5, 0, 7); c.arc(q[0] + q[2] * 0.4, q[1] + 10, q[2] * 0.4, 0, 7); c.arc(q[0] - q[2] * 0.4, q[1] + 14, q[2] * 0.36, 0, 7); c.fill();
+        });
+        c.globalAlpha = 1;
+      }
+
+      // title
+      var letters = [['C', '#ff5a5f'], ['R', '#ff9f1c'], ['O', '#ffd23f'], ['S', '#5cb83f'], ['S', '#2ec4b6'], ['Y', '#3d8bff'], [' ', '#fff'], ['W', '#c36bff'], ['A', '#ff5a5f'], ['Y', '#ffd23f']];
+      c.font = '400 118px ' + font;
+      c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+      var total = letters.reduce(function (a, l) { return a + c.measureText(l[0]).width + 4; }, 0);
+      var lx = (W - total) / 2;
+      letters.forEach(function (l) {
+        strokedText(c, l[0], lx, 160, l[1], INK, 18);
+        lx += c.measureText(l[0]).width + 4;
       });
+      c.textAlign = 'center';
+      c.font = '700 30px ' + font;
+      c.fillStyle = space ? '#bfb4ff' : '#2d5a22';
+      c.fillText('H O P  ·  D O D G E  ·  S U R V I V E', W / 2, 218);
+
+      // snapshot of the final scene
+      var bx = 60, by = 250, bw = 960, bh = 540;
+      c.save();
+      c.shadowColor = 'rgba(0,0,0,0.35)'; c.shadowBlur = 30; c.shadowOffsetY = 14;
+      roundRect(c, bx - 12, by - 12, bw + 24, bh + 24, 44);
+      c.fillStyle = INK; c.fill();
+      c.restore();
+      c.save();
+      roundRect(c, bx, by, bw, bh, 34); c.clip();
+      c.drawImage(snap, bx, by, bw, bh);
+      c.restore();
+      roundRect(c, bx, by, bw, bh, 34); c.lineWidth = 8; c.strokeStyle = '#ffffff'; c.stroke();
+
+      // biome tag + a chicken sticker
+      c.font = '400 40px ' + font;
+      var tag = BIOME_LABEL[curBiome] || BIOME_LABEL.forest;
+      var tw = c.measureText(tag).width + 56;
+      roundRect(c, bx + 24, by + 24, tw, 70, 35);
+      c.fillStyle = space ? '#3b2cb0' : '#2f8f3a'; c.fill();
+      c.lineWidth = 6; c.strokeStyle = '#ffffff'; c.stroke();
+      c.fillStyle = '#ffffff'; c.textAlign = 'left';
+      c.fillText(tag, bx + 52, by + 76);
+      if (chick) {
+        var cs = 230;
+        c.save();
+        c.translate(bx + bw - cs * 0.55, by + bh - cs * 0.5);
+        c.rotate(0.12);
+        c.shadowColor = 'rgba(0,0,0,0.35)'; c.shadowBlur = 18; c.shadowOffsetY = 8;
+        c.drawImage(chick, -cs / 2, -cs / 2, cs, cs);
+        c.restore();
+      }
+
+      // score
+      var record = el.gameOverPanel.classList.contains('is-record');
+      c.textAlign = 'center';
+      if (!record) {
+        c.font = '700 34px ' + font;
+        c.fillStyle = space ? '#bfb4ff' : '#2d5a22';
+        c.fillText('S C O R E', W / 2, 880);
+      }
+      c.font = '400 250px ' + font;
+      strokedText(c, String(score), W / 2, 1100, '#ffffff', INK, 30);
+      if (record) {
+        c.save();
+        c.translate(W / 2, 875); c.rotate(-0.04);
+        c.font = '400 46px ' + font;
+        var rw = c.measureText('🏆 NEW TOP SCORE!').width + 70;
+        roundRect(c, -rw / 2, -52, rw, 84, 42);
+        c.fillStyle = '#ffc107'; c.fill(); c.lineWidth = 7; c.strokeStyle = INK; c.stroke();
+        c.fillStyle = INK; c.fillText('🏆 NEW TOP SCORE!', 0, 10);
+        c.restore();
+      }
+
+      // chips: mode, top score, coins
+      var chips = [
+        Difficulty.cur.icon + ' ' + Difficulty.cur.label.toUpperCase(),
+        '🏆 TOP ' + bestScore,
+        '🪙 ' + runCoins
+      ];
+      var chipFont = 40, widths, gap = 22, sumW;
+      do {
+        c.font = '400 ' + chipFont + 'px ' + font;
+        widths = chips.map(function (t) { return c.measureText(t).width + 56; });
+        sumW = widths.reduce(function (a, b2) { return a + b2; }, 0) + gap * (chips.length - 1);
+        chipFont -= 2;
+      } while (sumW > W - 80 && chipFont > 20);
+      c.font = '400 ' + (chipFont + 2) + 'px ' + font;
+      var cx = (W - sumW) / 2;
+      chips.forEach(function (t, k) {
+        roundRect(c, cx, 1150, widths[k], 80, 40);
+        c.fillStyle = space ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.7)'; c.fill();
+        c.lineWidth = 5; c.strokeStyle = space ? '#8f6bff' : INK; c.stroke();
+        c.fillStyle = space ? '#ffffff' : INK; c.textAlign = 'left';
+        c.fillText(t, cx + 28, 1204);
+        cx += widths[k] + gap;
+      });
+
+      // footer
+      c.textAlign = 'center';
+      c.font = '700 40px ' + font;
+      c.fillStyle = space ? '#ffffff' : INK;
+      c.fillText('Can you beat me?', W / 2, 1292);
+      var host = location.protocol.indexOf('http') === 0 ? location.host : '';
+      if (host) { c.font = '700 26px ' + font; c.fillStyle = space ? '#bfb4ff' : '#2d5a22'; c.fillText(host, W / 2, 1330); }
+      return cv;
+    });
+  }
+
+  function openShare() {
+    if (state !== 'gameover' || !player) return;
+    var snap = snapshotScene();
+    buildShareCard(snap).then(function (cv) {
+      cv.toBlob(function (blob) {
+        if (!blob) return;
+        shareBlob = blob;
+        if (shareUrl) URL.revokeObjectURL(shareUrl);
+        shareUrl = URL.createObjectURL(blob);
+        el.shareImg.src = shareUrl;
+        el.shareNativeBtn.classList.toggle('hidden', !navigator.share);
+        el.shareCopyBtn.classList.toggle('hidden', !(navigator.clipboard && (window.ClipboardItem || navigator.clipboard.writeText)));
+        openModal(el.sharePanel);
+      }, 'image/png');
+    });
+  }
+
+  function closeShare() { closeModal(); }
+
+  function flashLabel(btn, text) {
+    var label = btn.querySelector('span:last-child');
+    var old = label.textContent;
+    label.textContent = text;
+    setTimeout(function () { label.textContent = old; }, 1600);
+  }
+
+  function shareNative() {
+    if (!shareBlob || !navigator.share) return;
+    var file = null;
+    try { file = new File([shareBlob], 'crossy-way-score.png', { type: 'image/png' }); } catch (e) { /* old browser */ }
+    var data = { title: 'Crossy Way', text: shareText() };
+    if (location.protocol.indexOf('http') === 0) data.url = location.href;
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) data.files = [file];
+    navigator.share(data).catch(function () { /* cancelled */ });
+  }
+
+  function saveShareImage() {
+    if (!shareUrl) return;
+    var a = document.createElement('a');
+    a.href = shareUrl;
+    a.download = 'crossy-way-score-' + score + '.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    flashLabel(el.shareSaveBtn, 'SAVED!');
+  }
+
+  function copyShare() {
+    if (!shareBlob) return;
+    var done = function () { flashLabel(el.shareCopyBtn, 'COPIED!'); };
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': shareBlob })]).then(done, function () {
+        navigator.clipboard.writeText(shareText()).then(done);
+      });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareText() + (location.protocol.indexOf('http') === 0 ? ' ' + location.href : '')).then(done);
     }
   }
 
@@ -1250,6 +1547,7 @@
       snapToStart();
     }
     world.update(0, camZ, 0);
+    syncBiome(true);
     refreshHud();
     updateCamera(0, true);
   }
@@ -1279,8 +1577,13 @@
     var quiet = state !== 'playing' || player.dying;
     var amb = world.amb;
     if (GameAudio) GameAudio.setAmbience(quiet ? 0 : amb.traffic, quiet ? 0 : Weather.rain);
+    syncBiome(false);
     var n = Weather.night;
-    Music.setMood(n > 0.6 ? 'night' : n < 0.4 ? 'day' : null);
+    Music.setMood(Weather.space > 0.5 ? 'space' : n > 0.6 ? 'night' : n < 0.4 ? 'day' : null);
+    if (Weather.space !== bdMix) {
+      bdMix = Weather.space;
+      backdrop.material.color.setHex(CONFIG.COLORS.grassB).lerp(bdSpace, bdMix);
+    }
     wxTimer -= dt;
     if (wxTimer <= 0) { wxTimer = 0.6; el.wxBadge.textContent = Weather.label(); }
 

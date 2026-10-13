@@ -1,5 +1,6 @@
-// The voxel chicken: grid hopping with squash & stretch, riding logs, coin
-// pickup and every way to die (car, train, drowning, the eagle).
+// The voxel chicken: grid hopping with squash & stretch, gliding on ice, riding
+// logs and platforms, coin pickup and every way to die (car, train, drowning,
+// a crocodile, falling into a chasm, the eagle).
 function Player(scene) {
   this.scene = scene;
   this.group = new THREE.Group();
@@ -7,16 +8,29 @@ function Player(scene) {
   this.scene.add(this.group);
 
   var eagle = Models.buildEagle();
+  this.eagleParts = eagle;
   this.eagle = eagle.group;
-  this.eagleWingL = eagle.wingL;
-  this.eagleWingR = eagle.wingR;
+  this.eagle.rotation.order = 'YXZ'; // yaw, then pitch, then bank
   this.eagle.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
   this.eagle.visible = false;
-  this.eagle.scale.setScalar(1.25);
+  this.eagle.scale.setScalar(1.3);
   this.scene.add(this.eagle);
   this.eagleStartPos = new THREE.Vector3();
+  this.eagleCtrlPos = new THREE.Vector3();
   this.eagleGrabPoint = new THREE.Vector3();
   this.eagleExitDir = new THREE.Vector3();
+  this.eagleTmp = new THREE.Vector3();
+  this.eagleTan = new THREE.Vector3();
+  var esg = new THREE.CircleGeometry(0.5, 20);
+  esg.rotateX(-Math.PI / 2);
+  this.eagleShadow = new THREE.Mesh(esg, new THREE.MeshBasicMaterial({
+    color: 0x000000, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2
+  }));
+  this.eagleShadow.renderOrder = 1;
+  this.eagleShadow.visible = false;
+  this.scene.add(this.eagleShadow);
+  this.onEagleGrab = null;
+  this.suit = false;
 
   this.deathVelocity = new THREE.Vector3();
   this.onCoin = null;
@@ -88,6 +102,12 @@ Player.prototype.setGhost = function (on) {
   if (!on) this.ghostMats.forEach(function (m) { m.opacity = 0.4; });
 };
 
+// Astronaut helmet (Space biome).
+Player.prototype.setSuit = function (on) {
+  this.suit = !!on;
+  if (this.helmet) this.helmet.visible = this.suit;
+};
+
 Player.prototype.setShield = function (on) {
   this.shield = on;
   this.bubble.visible = on;
@@ -145,6 +165,21 @@ Player.prototype.buildModel = function () {
   this.wingR.position.set(0.295, 0.45, -0.02);
   body.add(this.wingR);
 
+  // space helmet: a see-through bubble, only shown in the Space biome
+  var helmet = new THREE.Group();
+  var glass = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.66, 0.82), new THREE.MeshLambertMaterial({
+    color: 0xbdf4ff, transparent: true, opacity: 0.26, depthWrite: false
+  }));
+  glass.position.set(0, 0.74, 0.1);
+  helmet.add(glass);
+  helmet.add(Utils.voxelMesh([
+    { x: 0, y: 0.45, z: 0.02, w: 0.64, h: 0.07, d: 0.62, color: 0xdfe6f5 },
+    { x: 0, y: 0.45, z: 0.02, w: 0.66, h: 0.025, d: 0.64, color: 0x4de8ff }
+  ], { castShadow: false }));
+  helmet.visible = !!this.suit;
+  body.add(helmet);
+  this.helmet = helmet;
+
   body.scale.setScalar(CONFIG.CHICKEN_SCALE);
   body.traverse(function (o) { if (o.isMesh) { o.castShadow = true; } });
   this.bodyGroup = body;
@@ -201,6 +236,11 @@ Player.prototype.reset = function () {
   this.eaglePhase = null;
   this.eaglePhaseT = 0;
   this.eagle.visible = false;
+  this.eagleShadow.visible = false;
+  this.eagleParts.legL.rotation.x = this.eagleParts.legR.rotation.x = -0.9;
+  this.slideLeft = 0;
+  this.hopSlide = false;
+  this.deathCroc = null;
   this.group.visible = true;
   this.group.position.set(0, 0, 0);
   this.group.rotation.set(0, 0, 0);
@@ -227,7 +267,7 @@ Player.prototype.requestMove = function (dx, dz, world) {
   this.tryStartHop(dx, dz, world);
 };
 
-Player.prototype.tryStartHop = function (dx, dz, world) {
+Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
   var startX = this.x, startZ = this.z;
   var targetX = Math.round(startX) + dx; // forward/back hops snap to the grid
   var targetZ = startZ + dz;
@@ -239,7 +279,8 @@ Player.prototype.tryStartHop = function (dx, dz, world) {
   var farX = targetX + dx, farZ = targetZ + dz;
   var farOk = !world.isBlocked(farX, farZ) && farZ >= minZ;
   var leap = null;
-  if (this.jumpLevel >= 2 && farOk) leap = 'double';
+  if (isSlide) { /* gliding on ice: the caller already checked the tile */ }
+  else if (this.jumpLevel >= 2 && farOk) leap = 'double';
   else if (world.isBlocked(targetX, targetZ)) {
     if (this.jumpLevel >= 1 && world.isSmallObstacle(targetX, targetZ) && farOk) leap = 'over';
     else { this.bounce(dx, dz); return; }
@@ -248,8 +289,14 @@ Player.prototype.tryStartHop = function (dx, dz, world) {
     return;
   }
   if (leap) { targetX = farX; targetZ = farZ; }
-  this.hopDur = leap === 'double' ? 0.27 : leap === 'over' ? 0.22 : CONFIG.HOP_DURATION;
-  this.hopH = leap === 'double' ? 1.05 : leap === 'over' ? 0.85 : CONFIG.HOP_HEIGHT;
+  this.hopDur = isSlide ? 0.2 : leap === 'double' ? 0.27 : leap === 'over' ? 0.22 : CONFIG.HOP_DURATION;
+  this.hopH = isSlide ? 0.04 : leap === 'double' ? 1.05 : leap === 'over' ? 0.85 : CONFIG.HOP_HEIGHT;
+  this.hopSlide = !!isSlide;
+  if (!isSlide) {
+    // a hop that lands on ice keeps gliding: 2 tiles sideways, 1 forward / back
+    this.slideDx = dx; this.slideDz = dz;
+    this.slideLeft = leap ? 0 : dx !== 0 ? 2 : 1;
+  }
 
   this.face(dx, dz);
   this.hopping = true;
@@ -263,8 +310,26 @@ Player.prototype.tryStartHop = function (dx, dz, world) {
   this.onLog = null;
   this.fid.type = null;
   var r0 = world.getRow(Math.round(startZ));
-  if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ);
-  if (GameAudio) { if (leap) GameAudio.jump(leap); else GameAudio.hop(); }
+  if (isSlide) {
+    Particles.burst(startX, 0.06, startZ, { colors: [0xffffff, 0xcdeffa, 0x9fe9ff], count: 3, speed: 1.2, up: 0.9, size: 0.08, life: 0.35, gravity: 2, spread: 0.25, floor: 0 });
+    if (GameAudio && GameAudio.slide) GameAudio.slide();
+  } else {
+    if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ);
+    if (GameAudio) { if (leap) GameAudio.jump(leap); else GameAudio.hop(); }
+  }
+};
+
+// Keep sliding while the ice continues: returns true if another glide started.
+Player.prototype.glide = function (world) {
+  if (this.slideLeft <= 0) return false;
+  var row = world.getRow(Math.round(this.z));
+  if (!row || !row.ice) { this.slideLeft = 0; return false; }
+  var nx = Math.round(this.x) + this.slideDx, nz = Math.round(this.z) + this.slideDz;
+  var nrow = world.getRow(nz);
+  if (!nrow || !nrow.ice || world.isBlocked(nx, nz) || nz < this.maxZ - CONFIG.MAX_BACKTRACK) { this.slideLeft = 0; return false; }
+  this.slideLeft--;
+  this.tryStartHop(this.slideDx, this.slideDz, world, true);
+  return true;
 };
 
 // Walked into a tree / the edge of the field: a little bump back.
@@ -327,12 +392,13 @@ Player.prototype.update = function (dt, world) {
     else if (t > 0.85) sy = Utils.lerp(1.12, 0.8, (t - 0.85) / 0.15);
     else sy = Utils.lerp(1.18, 1.12, (t - 0.15) / 0.7);
     var sxz = Utils.lerp(1.04, 0.9, Math.sin(Math.PI * t));
+    if (this.hopSlide) { sy = 1 + (sy - 1) * 0.2; sxz = 1 + (sxz - 1) * 0.2; }
     this.group.scale.set(sxz, sy, sxz);
 
     // lean into the hop, a little wobble, wings flapping
     var arc = Math.sin(Math.PI * t);
-    this.bodyGroup.rotation.x = arc * -0.2;
-    this.bodyGroup.rotation.z = Math.sin(t * Math.PI * 2) * 0.07;
+    this.bodyGroup.rotation.x = this.hopSlide ? -0.14 : arc * -0.2; // leans back while skating
+    this.bodyGroup.rotation.z = this.hopSlide ? 0 : Math.sin(t * Math.PI * 2) * 0.07;
     this.bodyGroup.rotation.y = 0;
     var flap = arc * 1.0 + Math.sin(t * 34) * 0.18 * arc;
     this.wingL.rotation.z = flap;
@@ -347,7 +413,8 @@ Player.prototype.update = function (dt, world) {
       if (this.z > this.maxZ) this.maxZ = this.z;
       this.onLanded(world);
       if (this.onLand) this.onLand();
-      if (this.queuedMove && !this.dying) {
+      var gliding = !this.dying && this.glide(world);
+      if (!gliding && this.queuedMove && !this.dying) {
         var qm = this.queuedMove;
         this.queuedMove = null;
         this.tryStartHop(qm.dx, qm.dz, world);
@@ -400,10 +467,10 @@ Player.prototype.update = function (dt, world) {
     // carried along by a log (or a turtle)
     if (this.onLog) {
       var l = this.onLog;
-      this.x += l.direction * l.speed * dt;
+      this.x += (l.vx !== undefined ? l.vx : l.direction * l.speed) * dt;
       this.y = (l.curTop !== undefined ? l.curTop : l.top + l.bob - l.dip) + fAir;
       if (Math.abs(this.x) > CONFIG.PLAY_HALF + 0.9 || l.submerged) {
-        this.startDeath('drown', world); // carried off the edge, or the turtle dived
+        this.startDeath(world.drownType(Math.round(this.z)), world); // carried off the edge, or the turtle dived
       }
     } else {
       this.y = world.surfaceY(this.x, this.z) + fAir;
@@ -451,9 +518,9 @@ Player.prototype.onLanded = function (world) {
       this.onLog = log;
       log.dip = 0.11;
       if (log.pad) Particles.puff(this.x, log.top, this.z);
-      Particles.ring(this.x, (log.curTop !== undefined ? log.curTop : log.top) + 0.01, this.z, 0xdff6ff, 1.2);
+      Particles.ring(this.x, (log.curTop !== undefined ? log.curTop : log.top) + 0.01, this.z, log.platform ? 0xffd9a8 : 0xdff6ff, 1.2);
     } else {
-      this.startDeath('drown', world);
+      this.startDeath(world.drownType(Math.round(this.z)), world);
       return;
     }
   } else {
@@ -477,7 +544,8 @@ Player.prototype.checkHazards = function (world) {
   if (this.air < 0.3 && !this.ghost && this.invuln <= 0) {
     var v = world.checkVehicleHit(this.x, row);
     var t = !v && world.checkTrainHit(this.x, row);
-    if (v || t) {
+    var cr = !v && !t && world.checkCrocHit(this.x, row);
+    if (v || t || cr) {
       if (this.shield) {
         // the bubble takes the hit and pops
         this.setShield(false);
@@ -486,12 +554,12 @@ Player.prototype.checkHazards = function (world) {
         if (this.onShieldPop) this.onShieldPop();
         return;
       }
-      this.startDeath(v ? 'car' : 'train', world, v);
+      this.startDeath(v ? 'car' : t ? 'train' : 'croc', world, v || cr);
       return;
     }
   }
   if (!this.hopping && world.isWater(row) && !this.onLog) {
-    this.startDeath('drown', world);
+    this.startDeath(world.drownType(row), world);
   }
 };
 
@@ -527,20 +595,31 @@ Player.prototype.startDeath = function (type, world, hitBy) {
     if (GameAudio) GameAudio.splash();
     var wy = CONFIG.ROW_TOP.water;
     Particles.splash(this.x, wy, this.z);
+  } else if (type === 'fall') {
+    // into the chasm: no splash, just a long drop
+    if (GameAudio && GameAudio.fall) GameAudio.fall();
+    var vc = world && world.getRow(this.z) && world.getRow(this.z).biome === 'space' ? [0x8f6bff, 0x4de8ff, 0xffffff] : [0xff8a3d, 0xffd23f, 0x555555];
+    Particles.burst(this.x, this.y + 0.1, this.z, { colors: vc, count: 12, speed: 2, up: 3, size: 0.1, life: 0.7, gravity: 6, spread: 0.3, floor: this.y - 1 });
+  } else if (type === 'croc') {
+    this.deathCroc = hitBy || null;
+    if (hitBy) hitBy.chomp = 0.8;                 // the croc snaps shut on its prey
+    if (GameAudio && GameAudio.chomp) GameAudio.chomp();
+    Particles.feathers(this.x, this.y + 0.5, this.z, 14);
   } else if (type === 'eagle') {
-    if (GameAudio) { GameAudio.screech(); }
+    if (GameAudio && GameAudio.eagleAttack) GameAudio.eagleAttack(); else if (GameAudio) GameAudio.screech();
     var side = Math.random() < 0.5 ? -1 : 1;
-    this.eagleGrabPoint.set(this.x, this.y + 0.9, this.z);
-    this.eagleStartPos.set(this.x + side * 3.5, this.y + 11, this.z + 9);
-    this.eagleExitDir.set(-side * 0.3, 1, 0.9).normalize();
+    this.eagleSide = side;
+    this.eagleGrabPoint.set(this.x, this.y + 0.95, this.z);
+    this.eagleStartPos.set(this.x + side * 6.5, this.y + 12.5, this.z + 11.5);
+    this.eagleCtrlPos.set(this.x + side * 0.4, this.y + 5.5, this.z + 4.2);
+    this.eagleExitDir.set(-side * 0.35, 0.9, 0.7).normalize();
     this.eagle.position.copy(this.eagleStartPos);
-    this.eagle.rotation.y = Math.atan2(
-      this.eagleGrabPoint.x - this.eagleStartPos.x,
-      this.eagleGrabPoint.z - this.eagleStartPos.z
-    );
     this.eagle.visible = true;
-    this.eaglePhase = 'swoop';
+    this.eagleShadow.visible = true;
+    this.eagleFeatherT = 0;
+    this.eaglePhase = 'glide';
     this.eaglePhaseT = 0;
+    this.updateEagleDeath(0);
   }
   if (this.onDeath) this.onDeath(type);
 };
@@ -560,33 +639,158 @@ Player.prototype.updateDeath = function (dt) {
     this.group.rotation.z += dt * 3;
     var s = Utils.lerp(1, 0.2, sink);
     this.group.scale.set(s, s, s);
+  } else if (this.deathType === 'fall') {
+    var fall = Utils.clamp(t / 0.8, 0, 1);
+    this.group.position.y = this.y - fall * fall * 6;
+    this.group.rotation.y += dt * 9;
+    this.group.rotation.z += dt * 2.5;
+    var fs = Utils.lerp(1, 0.1, Utils.easeOutQuad(fall));
+    this.group.scale.set(fs, fs, fs);
+  } else if (this.deathType === 'croc') {
+    var c = this.deathCroc;
+    if (c) {
+      var hx = c.x + c.direction * (c.halfWidth - Models.CROC_HEAD / 2);
+      var pull = Utils.clamp(t / 0.16, 0, 1);
+      this.x = Utils.lerp(this.x, hx, 0.25 + pull * 0.4);
+      this.group.position.set(this.x, (c.curTop !== undefined ? c.curTop : 0.05) + 0.12 * (1 - pull), this.z);
+    }
+    var ck = Utils.clamp((t - 0.1) / 0.3, 0, 1);
+    var cs = Utils.lerp(1, 0.001, ck);
+    this.group.scale.set(cs * (1 + 0.2 * Math.sin(t * 40)), cs, cs);
+    this.group.rotation.z = Math.sin(t * 30) * 0.3 * (1 - ck);
   } else if (this.deathType === 'eagle') {
     this.updateEagleDeath(dt);
   }
-  var duration = this.deathType === 'eagle' ? 1.5 : this.deathType === 'drown' ? 0.75 : 0.9;
+  var duration = this.deathType === 'eagle' ? 2.3 : this.deathType === 'drown' ? 0.75 : this.deathType === 'fall' ? 0.85 : 0.9;
   if (t > duration) this.alive = false;
+};
+
+// The eagle attack, in three beats:
+//  glide - it banks in from high above, flaps, then tucks its wings and stoops
+//  grab  - wings flare, talons out, the chicken is snatched (feathers + shake)
+//  carry - powerful wing beats lift it away with the chicken dangling below
+var EAGLE_GLIDE = 1.0;
+var EAGLE_GRAB = 0.2;
+
+function poseEagle(E, shoulder, elbow, sweep, elbowSweep) {
+  E.wingR.rotation.set(0, sweep, shoulder);
+  E.wingL.rotation.set(0, -sweep, -shoulder);
+  E.elbowR.rotation.set(0, elbowSweep, elbow);
+  E.elbowL.rotation.set(0, -elbowSweep, -elbow);
+}
+
+Player.prototype.eagleAt = function (u, out, tan) {
+  var a = this.eagleStartPos, b = this.eagleCtrlPos, c = this.eagleGrabPoint, k = 1 - u;
+  out.set(
+    k * k * a.x + 2 * k * u * b.x + u * u * c.x,
+    k * k * a.y + 2 * k * u * b.y + u * u * c.y,
+    k * k * a.z + 2 * k * u * b.z + u * u * c.z
+  );
+  tan.set(
+    2 * k * (b.x - a.x) + 2 * u * (c.x - b.x),
+    2 * k * (b.y - a.y) + 2 * u * (c.y - b.y),
+    2 * k * (b.z - a.z) + 2 * u * (c.z - b.z)
+  ).normalize();
 };
 
 Player.prototype.updateEagleDeath = function (dt) {
   this.eaglePhaseT += dt;
-  var flap = Math.sin(this.eaglePhaseT * (this.eaglePhase === 'swoop' ? 34 : 22)) * 0.7;
-  this.eagleWingL.rotation.z = flap;
-  this.eagleWingR.rotation.z = -flap;
+  var T = this.eaglePhaseT;
+  var E = this.eagleParts, eg = this.eagle, side = this.eagleSide || 1;
+  var shadow = this.eagleShadow;
+  var ground = this.y - this.air + 0.03;
 
-  if (this.eaglePhase === 'swoop') {
-    var t = Utils.clamp(this.eaglePhaseT / 0.5, 0, 1);
-    this.eagle.position.lerpVectors(this.eagleStartPos, this.eagleGrabPoint, Utils.easeOutQuad(t));
-    // the chicken cowers while the shadow grows
-    this.group.scale.setScalar(Utils.lerp(1, 0.88, t));
-    if (t >= 1) {
+  if (this.eaglePhase === 'glide') {
+    var k = Utils.clamp(T / EAGLE_GLIDE, 0, 1);
+    var u = Math.pow(k, 1.6);                         // speeds up into the stoop
+    this.eagleAt(u, this.eagleTmp, this.eagleTan);
+    eg.position.copy(this.eagleTmp);
+    var tan = this.eagleTan;
+    var pitch = Math.asin(Utils.clamp(-tan.y, -1, 1));
+    eg.rotation.set(pitch, Math.atan2(tan.x, tan.z), -side * 0.5 * Math.sin(Math.PI * Math.min(1, k * 1.15)));
+    this.eagleDivePitch = pitch;
+
+    // flapping early on, then wings sweep back for the dive
+    var s = Utils.clamp((k - 0.5) / 0.3, 0, 1);
+    s = s * s * (3 - 2 * s);
+    var beat = Math.sin(T * 11);
+    poseEagle(E, (0.12 + 0.6 * beat) * (1 - s) - 0.08 * s, 0.5 * Math.sin(T * 11 - 1.0) * (1 - s), 0.1 + 0.8 * s, 0.7 * s);
+    E.legL.rotation.x = E.legR.rotation.x = -0.9;
+    E.head.rotation.x = 0.15 + 0.45 * k;
+
+    // its shadow races over the grass towards the chicken
+    shadow.position.set(this.eagleTmp.x, ground, this.eagleTmp.z);
+    shadow.scale.set(Utils.lerp(2.4, 0.9, u) * 1.5, 1, Utils.lerp(2.4, 0.9, u));
+    shadow.material.opacity = 0.34 * Math.min(1, k * 1.4);
+
+    // the chicken has noticed: it looks up and flaps in panic
+    if (k > 0.3) {
+      var f = Utils.clamp((k - 0.3) / 0.4, 0, 1);
+      var flutter = Math.sin(T * 55) * 0.7 * f;
+      this.wingL.rotation.z = flutter + 0.5 * f;
+      this.wingR.rotation.z = -flutter - 0.5 * f;
+      this.bodyGroup.rotation.x = -0.35 * f;
+      this.group.position.x = this.x + Math.sin(T * 70) * 0.02 * f;
+      this.group.scale.set(1 + 0.05 * f, 1 - 0.07 * f, 1 + 0.05 * f);
+      this.eyes[0].scale.y = this.eyes[1].scale.y = 1 + 0.35 * f;
+    }
+    if (T >= EAGLE_GLIDE) {
+      this.eaglePhase = 'grab';
+      this.eaglePhaseT = 0;
+      Particles.feathers(this.x, this.y + 0.6, this.z, 14);
+      Particles.ring(this.x, this.y + 0.05, this.z, 0xffffff, 2.2);
+      if (GameAudio && GameAudio.squawk) GameAudio.squawk();
+      if (this.onEagleGrab) this.onEagleGrab(this.eagleGrabPoint);
+    }
+  } else if (this.eaglePhase === 'grab') {
+    var g = Utils.clamp(T / EAGLE_GRAB, 0, 1);
+    eg.position.set(this.eagleGrabPoint.x, this.eagleGrabPoint.y + 0.25 * g, this.eagleGrabPoint.z);
+    eg.rotation.set(Utils.lerp(this.eagleDivePitch || 0.8, -0.4, g), eg.rotation.y, eg.rotation.z * (1 - g));
+    poseEagle(E, Utils.lerp(-0.08, 1.0, g), 0.3 * g, Utils.lerp(0.9, 0, g), Utils.lerp(0.7, 0, g));
+    E.legL.rotation.x = E.legR.rotation.x = Utils.lerp(-0.9, 0.55, g);
+    E.head.rotation.x = Utils.lerp(0.6, -0.1, g);
+    // the chicken is squashed in the talons
+    var sq = Math.sin(Math.PI * Math.min(1, g * 1.2));
+    this.group.position.set(this.x, this.y, this.z);
+    this.group.scale.set(1 + 0.25 * sq, 1 - 0.35 * sq, 1 + 0.25 * sq);
+    shadow.position.set(eg.position.x, ground, eg.position.z);
+    shadow.scale.set(1.4, 1, 1.4);
+    shadow.material.opacity = 0.3;
+    if (T >= EAGLE_GRAB) {
       this.eaglePhase = 'carry';
       this.eaglePhaseT = 0;
-      Particles.feathers(this.x, this.y + 0.6, this.z, 10);
+      this.eagleFeatherT = 0;
+      this.eagleYaw = eg.rotation.y;
     }
-  } else if (this.eaglePhase === 'carry') {
-    this.eagle.position.addScaledVector(this.eagleExitDir, dt * (6 + this.eaglePhaseT * 22));
-    this.group.position.set(this.eagle.position.x, this.eagle.position.y - 0.75, this.eagle.position.z);
-    this.group.rotation.z = Math.sin(this.eaglePhaseT * 14) * 0.25;
-    this.group.scale.setScalar(0.88);
+  } else {
+    // carry: climb away, wings pumping, chicken dangling
+    var c = T;
+    var speed = 3.5 + c * 15;
+    eg.position.addScaledVector(this.eagleExitDir, dt * speed);
+    var targetYaw = Math.atan2(this.eagleExitDir.x, this.eagleExitDir.z);
+    this.eagleYaw = Utils.lerpAngle(this.eagleYaw, targetYaw, Math.min(1, dt * 6));
+    eg.rotation.set(Utils.lerp(eg.rotation.x, -0.45, Math.min(1, dt * 8)), this.eagleYaw, Math.sin(c * 6.5) * 0.12);
+    var pump = Math.sin(c * 14);
+    poseEagle(E, 0.2 + 0.85 * pump, 0.5 * Math.sin(c * 14 - 1.0), 0.15, 0.1);
+    E.legL.rotation.x = E.legR.rotation.x = 0.55;
+    E.head.rotation.x = -0.05;
+    // the chicken hangs from the talons and swings
+    var sway = Math.sin(c * 9) * 0.35 * Math.exp(-c * 0.7);
+    this.group.position.set(eg.position.x + Math.sin(c * 9) * 0.12, eg.position.y - 0.85, eg.position.z);
+    this.group.rotation.z = sway;
+    this.group.rotation.y += dt * 5;
+    var shrink = Utils.lerp(0.88, 0.7, Utils.clamp(c / 1.2, 0, 1));
+    this.group.scale.setScalar(shrink);
+    this.wingL.rotation.z = Math.sin(c * 40) * 0.9;
+    this.wingR.rotation.z = -Math.sin(c * 40) * 0.9;
+    this.bodyGroup.rotation.x = -0.2;
+    this.eagleFeatherT -= dt;
+    if (this.eagleFeatherT <= 0) {
+      this.eagleFeatherT = 0.11;
+      Particles.burst(this.group.position.x, this.group.position.y + 0.4, this.group.position.z, { colors: [0xffffff, 0xf2f2f2, 0xffe9c9], count: 2, speed: 0.8, up: 0.5, size: 0.12, life: 1.1, gravity: 2.5, spread: 0.2, floor: -9 });
+    }
+    // the shadow slides away and fades as it climbs
+    shadow.position.set(eg.position.x, ground, eg.position.z - c * 2);
+    shadow.material.opacity = Math.max(0, 0.3 - c * 0.5);
   }
 };
