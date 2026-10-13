@@ -6,7 +6,7 @@
   var state = 'start'; // start | playing | gameover
   var runCoins = 0;
   var totalCoins = parseInt(localStorage.getItem(CONFIG.COINS_KEY) || '0', 10) || 0;
-  var bestScore = parseInt(localStorage.getItem(CONFIG.BEST_SCORE_KEY) || '0', 10) || 0;
+  var bestScore = readBest();
   var lastDeath = null;
 
   var backdrop, ambientLight, sunLight;
@@ -20,7 +20,8 @@
   var camX = 0, camZ = CONFIG.CAMERA_LEAD;
   var idleTimer = 0;      // seconds since the chicken last reached a new row
   var shakeT = 0;
-  var hurryShown = false;
+  var eagleCried = false;   // the eagle's screech has been played for this idle spell
+  var camKick = 0;          // little camera dip on every landing
   var tmpV = new THREE.Vector3();
   var startCam = { x: 0, z: CONFIG.CAMERA_LEAD }; // title-screen view (chicken parked in free screen space)
 
@@ -33,7 +34,6 @@
   var combo = { count: 0, mult: 1, timer: 0 };
   var runStats = { coins: 0, near: 0, maxMult: 1, maxCombo: 0 };
   var lastRow = 0;
-  var lastHurryNum = -1;
   var lastComboCount = -1;
   var wxTimer = 0;
   var swipeStyle = localStorage.getItem(CONFIG.SWIPE_KEY) || 'cam'; // 'cam' = follow the camera, 'classic'
@@ -42,13 +42,13 @@
   var IS_TOUCH = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
   var el = {};
-  ['score', 'coins', 'bestScore', 'powerups', 'toast', 'flash', 'freezeFx', 'startPanel', 'startBest', 'startCoins',
-    'playBtn', 'gameOverPanel', 'goCause', 'goMeta', 'finalScore', 'finalBest', 'finalCoins', 'newBest', 'confetti',
-    'restartBtn', 'shareBtn', 'warning', 'fullscreenBtn', 'settingsBtn', 'pauseBtn', 'goSettingsBtn', 'settingsPanel', 'closeSettingsBtn', 'dpad',
+  ['score', 'coins', 'bestScore', 'powerups', 'toast', 'flash', 'freezeFx', 'startPanel', 'modeBtn', 'infoBtn', 'infoPanel', 'closeInfoBtn', 'diffNote', 'goTitle', 'homeBtn',
+    'playBtn', 'gameOverPanel', 'finalScore', 'confetti',
+    'restartBtn', 'shareBtn', 'fullscreenBtn', 'settingsBtn', 'pauseBtn', 'settingsPanel', 'closeSettingsBtn', 'dpad',
     'startHint', 'combo', 'comboMult', 'comboCount', 'comboBar', 'pops', 'wxBadge', 'heroChick',
-    'startShopBtn', 'startMissionsBtn', 'missionDot', 'goShopBtn', 'goMissionsBtn',
+    'startShopBtn', 'startMissionsBtn', 'missionDot',
     'shopPanel', 'shopCoins', 'shopPreview', 'shopLook', 'shopGrid', 'shopHint', 'closeShopBtn',
-    'missionsPanel', 'missionsBody', 'closeMissionsBtn', 'musicSlider', 'musicPct']
+    'missionsPanel', 'missionsBody', 'closeMissionsBtn', 'musicSlider', 'musicPct', 'dpadSizeSlider', 'dpadSizePct', 'dpadSizeReset']
     .forEach(function (id) { el[id] = document.getElementById(id); });
   el.leanButtons = document.querySelectorAll('.lean-btn');
   el.fontButtons = document.querySelectorAll('.font-btn');
@@ -59,6 +59,7 @@
   el.shopTabs = document.querySelectorAll('.shop-tab');
   el.dpadButtons = document.querySelectorAll('.dpad-btn');
   el.dpadOptButtons = document.querySelectorAll('.dpad-opt');
+  el.diffButtons = document.querySelectorAll('.diff-btn');
   el.dswapButtons = document.querySelectorAll('.dswap-btn');
   el.swipeButtons = document.querySelectorAll('.swipe-btn');
   el.setTabs = document.querySelectorAll('.set-tab');
@@ -191,7 +192,7 @@
     renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('gameContainer').appendChild(renderer.domElement);
 
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.66);
+    ambientLight = new THREE.HemisphereLight(0xffffff, 0x9aa87a, 0.7);
     scene.add(ambientLight);
     sunLight = new THREE.DirectionalLight(0xfff6e0, 0.62);
     sunLight.castShadow = true;
@@ -219,6 +220,7 @@
     player.onCoin = function () { addCoins(1); };
     player.onItem = onItemCollected;
     player.onDeath = onPlayerDeath;
+    player.onLand = function () { camKick = 0.05; };
     player.onShieldPop = function () {
       if (GameAudio) GameAudio.pop();
       vibrate(30);
@@ -249,8 +251,11 @@
     applySound((localStorage.getItem(CONFIG.SOUND_KEY) || 'on') !== 'off');
     applyDpad(localStorage.getItem(CONFIG.DPAD_KEY) === 'on');
     applyDpadSwap(localStorage.getItem(CONFIG.DPAD_SWAP_KEY) === 'on');
+    var savedSize = parseInt(localStorage.getItem(CONFIG.DPAD_SIZE_KEY), 10);
+    applyDpadSize(isNaN(savedSize) ? defaultDpadSize() : savedSize, false);
     applySwipe(swipeStyle);
-    showSection(localStorage.getItem(CONFIG.TAB_KEY) || 'controls');
+    showSection(localStorage.getItem(CONFIG.TAB_KEY) || 'game');
+    applyDifficulty(Difficulty.mode, true);
     applyTod(Weather.timeMode());
     applyWx(Weather.weatherMode());
     setMusicUi(Music.getVolume());
@@ -314,9 +319,10 @@
       sx = (Math.random() - 0.5) * mag;
       sy = (Math.random() - 0.5) * mag;
     }
+    camKick *= Math.exp(-14 * dt);
     camera.position.set(
       camX + CONFIG.CAMERA_OFFSET.x + sx,
-      CONFIG.CAMERA_OFFSET.y + sy,
+      CONFIG.CAMERA_OFFSET.y + sy - camKick,
       camZ + CONFIG.CAMERA_OFFSET.z
     );
     camera.updateMatrixWorld(true);
@@ -426,11 +432,11 @@
           e.preventDefault(); attemptMove(1, 0); break;
         case ' ':
           e.preventDefault();
-          if (state === 'gameover') restart();
+          if (state === 'gameover') restart(true);
           else attemptMove(0, 1);
           break;
         case 'Enter':
-          if (state === 'gameover') restart();
+          if (state === 'gameover') restart(true);
           break;
       }
     });
@@ -473,7 +479,8 @@
     window.addEventListener('pointercancel', function () { press = null; });
 
     el.playBtn.addEventListener('click', function () { attemptMove(0, 1); });
-    el.restartBtn.addEventListener('click', restart);
+    el.restartBtn.addEventListener('click', function () { restart(true); }); // play again: skip the home screen
+    el.homeBtn.addEventListener('click', function () { restart(false); });
     el.shareBtn.addEventListener('click', shareScore);
     el.fullscreenBtn.addEventListener('click', function () {
       var d = document.documentElement;
@@ -485,16 +492,22 @@
     });
 
     // menus
-    [el.settingsBtn, el.pauseBtn, el.goSettingsBtn].forEach(function (b) {
+    [el.settingsBtn, el.pauseBtn].forEach(function (b) {
       b.addEventListener('click', function () {
         if (settingsOpen) closeModal(); else openModal(el.settingsPanel);
       });
     });
     el.closeSettingsBtn.addEventListener('click', closeModal);
     el.closeShopBtn.addEventListener('click', closeModal);
+    el.closeInfoBtn.addEventListener('click', closeModal);
+    el.infoBtn.addEventListener('click', function () { openModal(el.infoPanel); });
+    el.modeBtn.addEventListener('click', function () { showSection('game'); openModal(el.settingsPanel); });
+    el.diffButtons.forEach(function (b) {
+      b.addEventListener('click', function () { applyDifficulty(b.getAttribute('data-diff')); });
+    });
     el.closeMissionsBtn.addEventListener('click', closeModal);
-    [el.startShopBtn, el.goShopBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.shopPanel, renderShop); }); });
-    [el.startMissionsBtn, el.goMissionsBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.missionsPanel, renderMissions); }); });
+    [el.startShopBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.shopPanel, renderShop); }); });
+    [el.startMissionsBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.missionsPanel, renderMissions); }); });
     el.shopTabs.forEach(function (t) {
       t.addEventListener('click', function () {
         shopTab = t.getAttribute('data-tab');
@@ -544,6 +557,19 @@
     el.dswapButtons.forEach(function (btn) {
       btn.addEventListener('click', function () { applyDpadSwap(btn.getAttribute('data-dswap') === 'on'); });
     });
+    // D-pad size: dragging shows the real D-pad over the (dimmed) settings screen
+    el.dpadSizeSlider.addEventListener('input', function () {
+      applyDpadSize(parseInt(el.dpadSizeSlider.value, 10), true);
+      showDpadPreview(900);
+    });
+    el.dpadSizeSlider.addEventListener('pointerdown', function () { showDpadPreview(0); });
+    ['pointerup', 'pointercancel', 'change'].forEach(function (ev) {
+      el.dpadSizeSlider.addEventListener(ev, function () { showDpadPreview(900); });
+    });
+    el.dpadSizeReset.addEventListener('click', function () {
+      applyDpadSize(defaultDpadSize(), true);
+      showDpadPreview(900);
+    });
     el.setTabs.forEach(function (t) {
       t.addEventListener('click', function () { showSection(t.getAttribute('data-sec')); });
     });
@@ -589,6 +615,40 @@
   }
 
   // Touch screens: swap which side the Up/Down pair and the Left/Right pair sit on.
+  // ---- D-pad size ------------------------------------------------------------------
+  // Tablets get a bigger D-pad by default; phones keep the normal size.
+  function defaultDpadSize() {
+    return IS_TOUCH && Math.min(window.innerWidth, window.innerHeight) >= 700 ? 130 : 100;
+  }
+
+  function applyDpadSize(v, save) {
+    v = Utils.clamp(Math.round(v / 5) * 5, 60, 160);
+    document.documentElement.style.setProperty('--dpad-scale', String(v / 100));
+    el.dpadSizeSlider.value = v;
+    el.dpadSizeSlider.style.setProperty('--fill', ((v - 60) / 100 * 100) + '%');
+    el.dpadSizePct.textContent = v + '%';
+    if (save) {
+      try { localStorage.setItem(CONFIG.DPAD_SIZE_KEY, String(v)); } catch (e) { /* private mode */ }
+    }
+  }
+
+  // While you adjust the size the real D-pad appears on screen (even if it is switched
+  // off) and the settings card fades out around the slider, so nothing hides it.
+  var dpadPreviewTimer = null;
+  function showDpadPreview(hideAfterMs) {
+    clearTimeout(dpadPreviewTimer);
+    document.body.classList.add('dpad-previewing');
+    el.settingsPanel.classList.add('previewing');
+    el.dpad.classList.add('show');
+    if (hideAfterMs > 0) dpadPreviewTimer = setTimeout(endDpadPreview, hideAfterMs);
+  }
+  function endDpadPreview() {
+    clearTimeout(dpadPreviewTimer);
+    document.body.classList.remove('dpad-previewing');
+    el.settingsPanel.classList.remove('previewing');
+    el.dpad.classList.toggle('show', dpadOn);
+  }
+
   function applyDpadSwap(swap) {
     localStorage.setItem(CONFIG.DPAD_SWAP_KEY, swap ? 'on' : 'off');
     document.body.classList.toggle('dpad-swap', swap);
@@ -606,6 +666,39 @@
     localStorage.setItem(CONFIG.TAB_KEY, sec);
     el.setTabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-sec') === sec); });
     el.setSecs.forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-sec') === sec); });
+  }
+
+  // ---- difficulty ------------------------------------------------------------
+  // Each difficulty keeps its own top score (Medium keeps the original one).
+  function bestKey() {
+    return Difficulty.mode === 'medium' ? CONFIG.BEST_SCORE_KEY : CONFIG.BEST_SCORE_KEY + '_' + Difficulty.mode;
+  }
+  function readBest() {
+    var v = 0;
+    try { v = parseInt(localStorage.getItem(bestKey()) || '0', 10) || 0; } catch (e) { /* private mode */ }
+    return v;
+  }
+
+  function applyDifficulty(mode, silent) {
+    if (!CONFIG.DIFFICULTY[mode]) mode = 'medium';
+    Difficulty.mode = mode;
+    localStorage.setItem(CONFIG.DIFF_KEY, mode);
+    var D = Difficulty.cur;
+    el.diffButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-diff') === mode); });
+    el.diffNote.textContent = D.blurb;
+    el.modeBtn.textContent = D.icon + ' ' + D.label.toUpperCase();
+    el.modeBtn.setAttribute('data-mode', mode);
+    bestScore = readBest();
+    el.bestScore.textContent = bestScore;
+    // the road ahead is built for the new difficulty (mid-run it applies to rows built from now on)
+    if (!silent && state === 'start') rebuildWorld();
+  }
+
+  function rebuildWorld() {
+    world.destroy();
+    world = new World(scene);
+    hookWorld();
+    world.update(0, camZ, 0);
   }
 
   function applyTod(mode) {
@@ -646,6 +739,7 @@
 
   function closeModal() {
     if (!modalEl) return;
+    endDpadPreview();
     modalEl.classList.add('hidden');
     modalEl = null;
     settingsOpen = false;
@@ -665,7 +759,6 @@
     totalCoins = n;
     try { localStorage.setItem(CONFIG.COINS_KEY, String(totalCoins)); } catch (e) { /* private mode */ }
     el.coins.textContent = totalCoins;
-    el.startCoins.textContent = totalCoins;
     el.shopCoins.textContent = totalCoins;
   }
 
@@ -777,8 +870,6 @@
   function refreshHud() {
     el.score.textContent = score;
     el.bestScore.textContent = bestScore;
-    el.startBest.textContent = bestScore;
-    el.startCoins.textContent = totalCoins;
     el.coins.textContent = totalCoins;
     el.shopCoins.textContent = totalCoins;
     updateMissionDot();
@@ -844,7 +935,7 @@
   function onNewRow() {
     var z = player.maxZ;
     idleTimer = 0;
-    if (hurryShown) hideHurry();
+    eagleCried = false;
 
     combo.count = combo.timer > 0 ? combo.count + 1 : 1;
     combo.timer = COMBO_WINDOW;
@@ -998,7 +1089,6 @@
     if (type === 'car' || type === 'train') { shakeT = 0.32; vibrate(70); }
     else if (type === 'drown') { shakeT = 0.12; vibrate(40); }
     else vibrate(50);
-    hideHurry();
     resetCombo();
     Music.duck(0.2, 2.2);
   }
@@ -1036,19 +1126,16 @@
   function triggerGameOver() {
     state = 'gameover';
     document.body.classList.remove('in-run');
-    hideHurry();
     clearPowers();
     Missions.runEnd();
     var isBest = score > bestScore;
     if (isBest) {
       bestScore = score;
-      localStorage.setItem(CONFIG.BEST_SCORE_KEY, String(bestScore));
+      try { localStorage.setItem(bestKey(), String(bestScore)); } catch (e) { /* private mode */ }
     }
-    el.goCause.textContent = CAUSES[lastDeath] || 'Game over';
-    el.finalBest.textContent = bestScore;
-    el.finalCoins.textContent = runCoins;
-    el.goMeta.textContent = 'Row ' + player.maxZ + '  ·  Best combo x' + runStats.maxMult + '  ·  Close calls ' + runStats.near;
-    el.newBest.classList.toggle('hidden', !isBest || score === 0);
+    var record = isBest && score > 0;
+    el.goTitle.textContent = record ? '🏆 NEW TOP SCORE!' : 'GAME OVER';
+    el.gameOverPanel.classList.toggle('is-record', record);
     refreshHud();
     el.score.textContent = score;
     if (GameAudio) GameAudio.gameOver();
@@ -1057,23 +1144,27 @@
       if (settingsOpen) { panelHiddenForModal = el.gameOverPanel; return; }
       el.gameOverPanel.classList.remove('hidden');
       animateNumber(el.finalScore, score, 700);
-      if (isBest && score > 0) launchConfetti(); else el.confetti.innerHTML = '';
+      if (record) launchConfetti(); else el.confetti.innerHTML = '';
     }, 250);
   }
 
   function shareScore() {
-    var text = 'I scored ' + score + ' in Crossy Way! Can you beat me?';
+    var text = 'I scored ' + score + ' on ' + Difficulty.cur.label + ' in Crossy Way! Can you beat me?';
     if (navigator.share) {
       navigator.share({ title: 'Crossy Way', text: text, url: location.href }).catch(function () { /* cancelled */ });
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text + ' ' + location.href).then(function () {
-        el.shareBtn.textContent = '✔ COPIED';
-        setTimeout(function () { el.shareBtn.textContent = '⤴ SHARE'; }, 1600);
+        var label = el.shareBtn.querySelector('span:last-child');
+        label.textContent = 'COPIED!';
+        setTimeout(function () { label.textContent = 'SHARE'; }, 1600);
       });
     }
   }
 
-  function restart() {
+  // autoStart = true: "Play again" - straight into a new run, no home screen.
+  // false: back to the home screen.
+  function restart(autoStart) {
+    autoStart = autoStart === true;
     state = 'start';
     document.body.classList.remove('in-run');
     runCoins = 0;
@@ -1083,10 +1174,10 @@
     lastDeath = null;
     lastRow = 0;
     idleTimer = 0;
-    hideHurry();
+    eagleCried = false;
     clearPowers();
     el.gameOverPanel.classList.add('hidden');
-    el.startPanel.classList.remove('hidden');
+    el.gameOverPanel.classList.remove('is-record');
     el.confetti.innerHTML = '';
     el.pops.innerHTML = '';
     Particles.clear();
@@ -1095,35 +1186,33 @@
     hookWorld();
     player.reset();
     Weather.reset(false);
-    snapToStart();
+    if (autoStart) {
+      state = 'playing';
+      document.body.classList.add('in-run');
+      el.startPanel.classList.add('hidden');
+      Missions.runStart();
+      camX = 0;
+      camZ = CONFIG.CAMERA_LEAD;
+    } else {
+      el.startPanel.classList.remove('hidden');
+      snapToStart();
+    }
     world.update(0, camZ, 0);
     refreshHud();
     updateCamera(0, true);
   }
 
-  function showHurry() {
-    if (hurryShown) return;
-    hurryShown = true;
-    el.warning.classList.remove('hidden');
-    if (GameAudio) GameAudio.eagleCry();
-  }
-
-  function hideHurry() {
-    hurryShown = false;
-    lastHurryNum = -1;
-    el.warning.classList.add('hidden');
-  }
-
-  // Dawdling (no new row for a while) is the only thing that summons the eagle.
+  // Standing still is the only thing that summons the eagle. There is no on-screen
+  // alert: its screech plays 3 seconds before it arrives (the total wait depends
+  // on the difficulty: Easy 12 s, Medium 9 s, Hard 7.5 s, Extreme 6 s).
   function checkIdle() {
     if (state !== 'playing' || !player.alive || player.dying) return;
-    if (idleTimer >= CONFIG.IDLE_EAGLE) {
-      hideHurry();
+    var wait = Difficulty.cur.eagle;
+    if (idleTimer >= wait) {
       player.startDeath('eagle', world);
-    } else if (idleTimer >= CONFIG.IDLE_WARN) {
-      showHurry();
-      var left = Math.ceil(CONFIG.IDLE_EAGLE - idleTimer);
-      if (left !== lastHurryNum) { lastHurryNum = left; el.warning.textContent = 'HURRY! 🦅 ' + left; }
+    } else if (idleTimer >= wait - 3 && !eagleCried) {
+      eagleCried = true;
+      if (GameAudio) GameAudio.eagleCry();
     }
   }
 
@@ -1132,6 +1221,9 @@
     if (settingsOpen) return;
     var ls = world.listener;
     ls.x = player.x; ls.z = player.z; ls.ghost = !!powers.ghost;
+    var me = camera.matrixWorld.elements;
+    var vw = world.view || (world.view = {});
+    vw.x = camX; vw.z = camZ; vw.right = camera.right * 0.82; vw.rx = me[0]; vw.rz = me[2];
     world.update(dt, camZ, Math.round(player.z));
 
     Weather.update(dt, player.maxZ, camX, camZ, currentLevel());

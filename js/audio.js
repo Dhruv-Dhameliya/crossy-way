@@ -290,10 +290,28 @@ var GameAudio = (function () {
       tone(48, 2.6, 'sine', 0.2, { delay: delay + 0.1, freqEnd: 30, attack: 0.4 });
     },
 
-    // HURRY warning: a distant eagle cry (replaces the old harsh beeps)
+    // The eagle's screech: three sharp, falling "kee-kee-kee" cries. It is the ONLY
+    // warning you get that the eagle is coming (3 seconds before it arrives).
     eagleCry: function () {
-      tone(1500, 0.45, 'triangle', 0.035, { freqEnd: 900, vibrato: 14, attack: 0.05 });
-      tone(1100, 0.45, 'sine', 0.03, { freqEnd: 700, vibrato: 14, attack: 0.05, delay: 0.03 });
+      [0, 0.3, 0.6].forEach(function (d, i) {
+        tone(2500 - i * 160, 0.26, 'sawtooth', 0.06, { freqEnd: 1500 - i * 90, vibrato: 20, delay: d, attack: 0.02 });
+        tone(3300 - i * 200, 0.22, 'triangle', 0.035, { freqEnd: 2200, delay: d + 0.02 });
+        noise(0.2, 0.05, { filter: 'highpass', freq: 3500, delay: d });
+      });
+    },
+
+    // Signature sounds of the special vehicles
+    siren: function (vol) {
+      [0, 0.45].forEach(function (d) {
+        tone(650, 0.42, 'square', 0.04, { vol: vol, freqEnd: 1100, delay: d, attack: 0.04 });
+        tone(1300, 0.42, 'sine', 0.025, { vol: vol, freqEnd: 2200, delay: d, attack: 0.04 });
+      });
+    },
+    jingle: function (vol) {
+      [784, 988, 1175, 988, 1175, 1568].forEach(function (f, i) {
+        tone(f, 0.18, 'sine', 0.06, { vol: vol, delay: i * 0.13 });
+        tone(f * 2, 0.12, 'triangle', 0.02, { vol: vol, delay: i * 0.13 });
+      });
     }
   };
 })();

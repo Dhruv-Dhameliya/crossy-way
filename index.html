@@ -48,7 +48,6 @@
 
   <div id="pops"></div>
   <div id="toast"></div>
-  <div id="warning" class="hidden">HURRY! 🦅</div>
 
   <!-- in-run pause button (the welcome / game-over screens have their own menu buttons) -->
   <div class="corner-buttons">
@@ -76,59 +75,31 @@
     <button id="playBtn" class="play-btn"><span class="play-ico">▶</span> PLAY</button>
     <div class="menu-row">
       <button id="startShopBtn" class="menu-btn shop"><span class="mi">🛍️</span> SHOP</button>
-      <button id="startMissionsBtn" class="menu-btn missions"><span class="mi">🎯</span> MISSIONS<i id="missionDot"
-          class="dot"></i></button>
+      <button id="startMissionsBtn" class="menu-btn missions"><span class="mi">🎯</span> MISSIONS<i id="missionDot" class="dot"></i></button>
+    </div>
+    <div class="menu-row icons">
+      <button id="infoBtn" class="menu-btn info icon" title="How to play" aria-label="How to play">ℹ️</button>
+      <button id="modeBtn" class="menu-btn mode" data-mode="medium" title="Change difficulty">⚡ MEDIUM</button>
       <button id="settingsBtn" class="menu-btn settings icon" title="Settings (Esc)" aria-label="Settings">⚙️</button>
       <button id="fullscreenBtn" class="menu-btn full icon" title="Fullscreen" aria-label="Fullscreen">⛶</button>
     </div>
     <p id="startHint" class="hint">or tap anywhere · press an arrow key</p>
-
-    <div class="stat-chips">
-      <div class="chip"><span class="ci">🏆</span><b id="startBest">0</b><small>TOP SCORE</small></div>
-      <div class="chip"><span class="ci">🪙</span><b id="startCoins">0</b><small>COINS</small></div>
-    </div>
-
-    <div class="pg">
-      <div class="pg-title">POWER-UPS</div>
-      <div class="pg-grid">
-        <div class="pg-item" style="--c:#ff5a5f"><span>🧲</span><b>Magnet</b><small>pulls coins</small></div>
-        <div class="pg-item" style="--c:#9ad7ff"><span>👻</span><b>Ghost</b><small>go through cars</small></div>
-        <div class="pg-item" style="--c:#3d8bff"><span>🛡️</span><b>Shield</b><small>one free hit</small></div>
-        <div class="pg-item" style="--c:#5fe3ff"><span>❄️</span><b>Freeze</b><small>stops traffic</small></div>
-        <div class="pg-item" style="--c:#ffc107"><span>💰</span><b>2x Coins</b><small>double pay</small></div>
-        <div class="pg-item" style="--c:#ff7a1a"><span>💣</span><b>Blast</b><small>clears the lane</small></div>
-      </div>
-    </div>
-    <p class="help">Arrows / WASD · Swipe or tap on touch · Esc pauses</p>
   </div>
 
   <!-- ===== GAME OVER ===== -->
   <div id="gameOverPanel" class="panel hidden">
     <div id="confetti"></div>
     <div class="go-card">
-      <div class="go-ribbon"><span>GAME OVER</span></div>
-      <div id="newBest" class="new-best hidden"><span>🏆</span> NEW TOP SCORE! <span>🏆</span></div>
-      <p id="goCause" class="go-cause">Game over</p>
+      <div class="go-ribbon"><span id="goTitle">GAME OVER</span></div>
       <div class="go-score">
         <small>SCORE</small>
         <b id="finalScore">0</b>
       </div>
-      <div class="go-stats">
-        <div class="stat s-top"><span>🏆</span><b id="finalBest">0</b><small>TOP</small></div>
-        <div class="stat s-coin"><span>🪙</span><b>+<i id="finalCoins">0</i></b><small>COINS</small></div>
+      <div class="go-row">
+        <button id="shareBtn" class="share-btn"><span class="gi">⤴</span><span>SHARE</span></button>
+        <button id="restartBtn"><span class="gi">▶</span><span>PLAY AGAIN</span></button>
+        <button id="homeBtn" class="home-btn"><span class="gi">🏠</span><span>HOME</span></button>
       </div>
-      <div id="goMeta" class="go-meta"></div>
-      <div class="go-actions">
-        <button id="restartBtn"><span>▶</span> PLAY AGAIN</button>
-        <button id="shareBtn" class="share-btn">⤴ SHARE</button>
-      </div>
-      <div class="go-menu">
-        <button id="goShopBtn" class="menu-btn small shop">🛍️ SHOP</button>
-        <button id="goMissionsBtn" class="menu-btn small missions">🎯 MISSIONS</button>
-        <button id="goSettingsBtn" class="menu-btn small settings icon" title="Settings"
-          aria-label="Settings">⚙️</button>
-      </div>
-      <p class="go-help">Space or Enter to play again</p>
     </div>
   </div>
 
@@ -162,20 +133,68 @@
     </div>
   </div>
 
+  <!-- ===== INFO ===== -->
+  <div id="infoPanel" class="panel modal hidden">
+    <div class="set-card info-card">
+      <h2>HOW TO PLAY</h2>
+      <div class="sec-title">THE BASICS</div>
+      <ul class="info-list">
+        <li>🐔 <b>Hop forward</b> to reach new rows. Quick hops build a <b>combo</b> up to x5.</li>
+        <li>🚗 <b>Dodge traffic</b> and <b>cross rivers</b> on logs, lily pads and turtles.</li>
+        <li>😰 Squeeze past a vehicle for a <b>close call</b> bonus.</li>
+        <li>🪙 Collect <b>coins</b> to buy chickens and outfits in the shop.</li>
+      </ul>
+      <div class="sec-title">POWER-UPS</div>
+      <div class="pg-grid">
+        <div class="pg-item" style="--c:#ff5a5f"><span>🧲</span><b>Magnet</b><small>pulls coins to you</small></div>
+        <div class="pg-item" style="--c:#9ad7ff"><span>👻</span><b>Ghost</b><small>go through traffic</small></div>
+        <div class="pg-item" style="--c:#3d8bff"><span>🛡️</span><b>Shield</b><small>survive one hit</small></div>
+        <div class="pg-item" style="--c:#5fe3ff"><span>❄️</span><b>Freeze</b><small>stops all traffic</small></div>
+        <div class="pg-item" style="--c:#ffc107"><span>💰</span><b>2x Coins</b><small>coins count double</small></div>
+        <div class="pg-item" style="--c:#ff7a1a"><span>💣</span><b>Blast</b><small>clears nearby vehicles</small></div>
+      </div>
+      <div class="sec-title">WATCH OUT FOR</div>
+      <ul class="info-list">
+        <li>🚦 <b>Train signals:</b> <span class="sig green"></span> green = the track is clear, <span class="sig red"></span> flashing red = a train is about to come.</li>
+        <li>🐢 <b>Turtles</b> shake, then dive. Hop off before they go under!</li>
+        <li>🦅 <b>The eagle:</b> if you stand still you'll hear it screech. 3 seconds later it grabs you.</li>
+        <li>🚑 Special vehicles: ambulances, ice-cream trucks, tractors, motorbikes and fast sports cars.</li>
+        <li>🌲 Hay bales, fences, scarecrows, barrels and more block your way.</li>
+      </ul>
+      <button id="closeInfoBtn" class="close-btn">◀ BACK</button>
+    </div>
+  </div>
+
   <!-- ===== SETTINGS ===== -->
   <div id="settingsPanel" class="panel modal settings-panel hidden">
     <div class="set-card">
       <h2>PAUSED</h2>
 
       <div class="set-tabs" role="tablist">
-        <button class="set-tab active" data-sec="controls"><span class="ti">🎮</span><span class="tl">Controls</span></button>
+        <button class="set-tab active" data-sec="game"><span class="ti">⚡</span><span class="tl">Game</span></button>
+        <button class="set-tab" data-sec="controls"><span class="ti">🎮</span><span class="tl">Controls</span></button>
         <button class="set-tab" data-sec="world"><span class="ti">🌦️</span><span class="tl">World</span></button>
         <button class="set-tab" data-sec="audio"><span class="ti">🔊</span><span class="tl">Audio</span></button>
         <button class="set-tab" data-sec="display"><span class="ti">🖥️</span><span class="tl">Display</span></button>
       </div>
 
+      <!-- GAME -->
+      <div class="set-sec active" data-sec="game">
+        <div class="setting-group">
+          <div class="setting-label">Difficulty</div>
+          <div class="option-row diff-row">
+            <button class="option-btn diff-btn" data-diff="easy">🌱 Easy</button>
+            <button class="option-btn diff-btn" data-diff="medium">⚡ Medium</button>
+            <button class="option-btn diff-btn" data-diff="hard">🔥 Hard</button>
+            <button class="option-btn diff-btn" data-diff="extreme">💀 Extreme</button>
+          </div>
+          <p id="diffNote" class="setting-note"></p>
+          <p class="setting-note">Each difficulty keeps its own top score. Harder modes mean faster traffic, busier roads, more trains and a quicker eagle.</p>
+        </div>
+      </div>
+
       <!-- CONTROLS -->
-      <div class="set-sec active" data-sec="controls">
+      <div class="set-sec" data-sec="controls">
         <div class="setting-group">
           <div class="setting-label">Camera View</div>
           <div class="option-row">
@@ -205,6 +224,12 @@
             <button class="option-btn dswap-btn" data-dswap="off">▲▼ Left · ◀▶ Right</button>
             <button class="option-btn dswap-btn" data-dswap="on">◀▶ Left · ▲▼ Right</button>
           </div>
+        </div>
+        <div class="setting-group dpad-size-group">
+          <div class="setting-label">D-pad Size <span id="dpadSizePct" class="pct">100%</span></div>
+          <input id="dpadSizeSlider" class="slider" type="range" min="60" max="160" step="5" value="100" aria-label="D-pad size" />
+          <div class="size-row"><small>Smaller</small><button id="dpadSizeReset" class="mini-btn" type="button">↺ Reset</button><small>Bigger</small></div>
+          <p class="setting-note">Drag the slider: the real D-pad pops up on screen so you can see exactly how big it will be.</p>
         </div>
       </div>
 

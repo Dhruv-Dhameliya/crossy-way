@@ -67,10 +67,34 @@ var CONFIG = {
   FONT_KEY: 'crossy_way_title_font',
   SOUND_KEY: 'crossy_way_sound',
   QUALITY_KEY: 'crossy_way_quality',
+  DIFF_KEY: 'crossy_way_difficulty',
+  // Difficulty: speed = traffic / log / train speed, traffic = how crowded the roads are,
+  // train = how often trains come (lower = more often), trainWarn = seconds of signal warning,
+  // eagle = seconds of standing still before the eagle arrives (its cry comes 3 s earlier),
+  // ramp = rows until full difficulty, special = how often unusual lanes (turtles) appear,
+  // spread = how different vehicle speeds in one lane are (tighter = busier, convoy-like roads).
+  DIFFICULTY: {
+    easy:    { label: 'Easy',    icon: '🌱', speed: 0.78, traffic: 0.78, train: 1.5,  trainWarn: 2.4, eagle: 12,  ramp: 260, special: 0.6, spread: 1, blurb: 'Slower, calmer traffic. Trains are rare and the eagle waits 12 seconds.' },
+    medium:  { label: 'Medium',  icon: '⚡', speed: 1,    traffic: 1,    train: 1,    trainWarn: 1.9, eagle: 9,   ramp: 180, special: 1,   spread: 1, blurb: 'The classic mix. The eagle comes after 9 seconds.' },
+    hard:    { label: 'Hard',    icon: '🔥', speed: 1.25, traffic: 1.25, train: 0.75, trainWarn: 1.6, eagle: 7.5, ramp: 140, special: 1.3, spread: 0.8, blurb: 'Faster, busier roads, more trains, and the eagle after 7.5 seconds.' },
+    extreme: { label: 'Extreme', icon: '💀', speed: 1.5,  traffic: 1.5,  train: 0.5,  trainWarn: 1.3, eagle: 6,   ramp: 100, special: 1.6, spread: 0.55, blurb: 'Flat-out speed, packed roads, constant trains, and the eagle after only 6 seconds!' }
+  },
+
   DPAD_KEY: 'crossy_way_dpad',
   DPAD_SWAP_KEY: 'crossy_way_dpad_swap',
+  DPAD_SIZE_KEY: 'crossy_way_dpad_size',
   SWIPE_KEY: 'crossy_way_swipe_style',
   TAB_KEY: 'crossy_way_settings_tab',
   TOD_KEY: 'crossy_way_time_of_day',
   WEATHER_KEY: 'crossy_way_weather'
+};
+
+// The current difficulty (read by the world, the eagle timer and the HUD).
+var Difficulty = {
+  mode: (function () {
+    var m = null;
+    try { m = localStorage.getItem(CONFIG.DIFF_KEY); } catch (e) { /* private mode */ }
+    return CONFIG.DIFFICULTY[m] ? m : 'medium';
+  })(),
+  get cur() { return CONFIG.DIFFICULTY[this.mode]; }
 };

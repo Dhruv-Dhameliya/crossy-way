@@ -86,6 +86,105 @@ var Models = (function () {
     out.push(B(x + ox, 0.12, z + oz, 0.11, 0.06, 0.11, c));
   }
 
+  // ---- more obstacles that block a tile ----
+  function hayBoxes(out, x, z) {
+    out.push(B(x, 0.28, z, 0.82, 0.56, 0.7, 0xe3b94a));
+    out.push(B(x - 0.26, 0.28, z, 0.07, 0.58, 0.72, 0xb98a2a));
+    out.push(B(x + 0.26, 0.28, z, 0.07, 0.58, 0.72, 0xb98a2a));
+    if (Math.random() < 0.5) out.push(B(x + 0.05, 0.7, z, 0.6, 0.3, 0.5, 0xd9ad3c));
+  }
+  function fenceBoxes(out, x, z) {
+    var wood = 0xa9743c;
+    out.push(B(x - 0.42, 0.28, z, 0.1, 0.56, 0.1, 0x8d5a2b));
+    out.push(B(x + 0.42, 0.28, z, 0.1, 0.56, 0.1, 0x8d5a2b));
+    out.push(B(x, 0.26, z, 0.08, 0.5, 0.08, 0x8d5a2b));
+    out.push(B(x, 0.2, z, 0.96, 0.07, 0.06, wood));
+    out.push(B(x, 0.42, z, 0.96, 0.07, 0.06, wood));
+  }
+  function scarecrowBoxes(out, x, z) {
+    out.push(B(x, 0.5, z, 0.08, 1.0, 0.08, 0x8d5a2b));
+    out.push(B(x, 0.78, z, 0.72, 0.07, 0.07, 0x8d5a2b));
+    out.push(B(x, 0.64, z, 0.3, 0.38, 0.16, 0x3f7fe0));
+    out.push(B(x + 0.08, 0.6, z - 0.09, 0.1, 0.1, 0.02, 0xe53935));
+    out.push(B(x, 1.06, z, 0.22, 0.22, 0.2, 0xf0d0a0));
+    out.push(B(x - 0.05, 1.07, z - 0.11, 0.04, 0.04, 0.02, 0x222222));
+    out.push(B(x + 0.05, 1.07, z - 0.11, 0.04, 0.04, 0.02, 0x222222));
+    out.push(B(x, 1.2, z, 0.38, 0.05, 0.38, 0x6b4a2a));
+    out.push(B(x, 1.28, z, 0.22, 0.12, 0.22, 0x6b4a2a));
+    out.push(B(x - 0.4, 0.7, z, 0.1, 0.16, 0.05, 0xe3b94a)); // straw
+    out.push(B(x + 0.4, 0.7, z, 0.1, 0.16, 0.05, 0xe3b94a));
+  }
+  function stumpBoxes(out, x, z) {
+    out.push(B(x, 0.18, z, 0.5, 0.36, 0.5, 0x8a5a2b));
+    out.push(B(x, 0.375, z, 0.42, 0.03, 0.42, 0xd9a766));
+    out.push(B(x - 0.1, 0.375, z - 0.08, 0.14, 0.035, 0.14, 0xc08a50));
+    out.push(B(x + 0.22, 0.12, z, 0.12, 0.2, 0.3, 0x3f9f4b)); // moss
+  }
+  function barrelBoxes(out, x, z) {
+    out.push(B(x - 0.2, 0.3, z, 0.4, 0.6, 0.4, 0xb03a2e));
+    out.push(B(x - 0.2, 0.18, z, 0.42, 0.06, 0.42, 0x333333));
+    out.push(B(x - 0.2, 0.44, z, 0.42, 0.06, 0.42, 0x333333));
+    out.push(B(x + 0.22, 0.25, z + 0.08, 0.36, 0.5, 0.36, 0x2f6fb0));
+    out.push(B(x + 0.22, 0.2, z + 0.08, 0.38, 0.06, 0.38, 0x333333));
+  }
+  function sunflowerBoxes(out, x, z) {
+    out.push(B(x, 0.4, z, 0.06, 0.8, 0.06, 0x3f9f4b));
+    out.push(B(x + 0.1, 0.3, z, 0.18, 0.05, 0.1, 0x3f9f4b));
+    out.push(B(x, 0.9, z - 0.02, 0.4, 0.4, 0.07, 0xffd23f));
+    out.push(B(x, 0.9, z - 0.07, 0.2, 0.2, 0.05, 0x6b3d1a));
+  }
+  function mushroomBoxes(out, x, z) {
+    out.push(B(x, 0.14, z, 0.16, 0.28, 0.16, 0xf5f0e6));
+    out.push(B(x, 0.34, z, 0.46, 0.14, 0.46, 0xe53935));
+    out.push(B(x - 0.12, 0.42, z - 0.1, 0.1, 0.03, 0.1, 0xffffff));
+    out.push(B(x + 0.12, 0.42, z + 0.08, 0.1, 0.03, 0.1, 0xffffff));
+    out.push(B(x + 0.22, 0.1, z - 0.22, 0.1, 0.18, 0.1, 0xf5f0e6));
+    out.push(B(x + 0.22, 0.23, z - 0.22, 0.22, 0.08, 0.22, 0xe53935));
+  }
+
+  var OBSTACLE_ODDS = [
+    { value: 'tree', weight: 0.38 }, { value: 'rock', weight: 0.11 }, { value: 'bush', weight: 0.13 },
+    { value: 'hay', weight: 0.09 }, { value: 'fence', weight: 0.08 }, { value: 'scarecrow', weight: 0.04 },
+    { value: 'stump', weight: 0.05 }, { value: 'barrels', weight: 0.05 }, { value: 'sunflower', weight: 0.05 },
+    { value: 'mushroom', weight: 0.02 }
+  ];
+  // One random blocker for a tile (all of them stop the chicken like a tree does).
+  function obstacleBoxes(out, x, z) {
+    switch (Utils.weightedChoice(OBSTACLE_ODDS)) {
+      case 'tree': treeBoxes(out, x, z, Utils.randInt(0, 3)); break;
+      case 'rock': rockBoxes(out, x, z); break;
+      case 'bush': bushBoxes(out, x, z); break;
+      case 'hay': hayBoxes(out, x, z); break;
+      case 'fence': fenceBoxes(out, x, z); break;
+      case 'scarecrow': scarecrowBoxes(out, x, z); break;
+      case 'stump': stumpBoxes(out, x, z); break;
+      case 'barrels': barrelBoxes(out, x, z); break;
+      case 'sunflower': sunflowerBoxes(out, x, z); break;
+      default: mushroomBoxes(out, x, z);
+    }
+  }
+
+  // Scenery material: like the shared voxel material, but everything above the
+  // ground sways gently in the wind (tall trees and flowers more than low rocks).
+  var _windU = { value: 0 };
+  var _sceneryMat = null;
+  function sceneryMaterial() {
+    if (!_sceneryMat) {
+      _sceneryMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      _sceneryMat.onBeforeCompile = function (shader) {
+        shader.uniforms.uTime = _windU;
+        shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader.replace('#include <begin_vertex>',
+          '#include <begin_vertex>\n' +
+          'float sway = max(0.0, position.y - 0.4);\n' +
+          'transformed.x += sin(uTime * 1.7 + position.x * 0.9 + position.z * 0.6) * sway * 0.04;\n' +
+          'transformed.z += cos(uTime * 1.3 + position.x * 0.8) * sway * 0.025;');
+      };
+      _sceneryMat.customProgramCacheKey = function () { return 'sway'; };
+      _sceneryMat.__shared = true;
+    }
+    return _sceneryMat;
+  }
+
   // ---------------------------------------------------------------------
   // Vehicles (face +x; the lane flips them with rotation.y)
   // ---------------------------------------------------------------------
@@ -188,10 +287,100 @@ var Models = (function () {
     } }
   };
 
+  // ---- more vehicles ----
+  VEHICLES.motorbike = { len: 0.95, build: function (c) {
+    var o = [], jacket = Utils.choice([0xe53935, 0x3f7fe0, 0x222222, 0xffa726, 0x35b86b]);
+    o.push(B(0, 0.3, 0, 0.8, 0.12, 0.16, c));
+    o.push(B(0.16, 0.42, 0, 0.3, 0.14, 0.2, c));
+    o.push(B(-0.25, 0.38, 0, 0.3, 0.08, 0.2, 0x222222));
+    o.push(B(0.38, 0.5, 0, 0.06, 0.3, 0.06, 0x777777));
+    o.push(B(0.36, 0.66, 0, 0.06, 0.06, 0.42, 0x333333));
+    o.push(B(0.46, 0.46, 0, 0.05, 0.1, 0.14, 0xfff3b0));
+    o.push(B(-0.5, 0.38, 0, 0.04, 0.08, 0.1, 0xd62b2b));
+    o.push(B(0.38, 0.17, 0, 0.34, 0.34, 0.1, DARK));
+    o.push(B(-0.38, 0.17, 0, 0.34, 0.34, 0.1, DARK));
+    o.push(B(-0.16, 0.7, 0, 0.22, 0.4, 0.28, jacket));
+    o.push(B(-0.14, 1.0, 0, 0.24, 0.22, 0.24, Utils.choice([0x222222, 0xf2f2f2, 0xe53935])));
+    o.push(B(-0.03, 1.0, 0, 0.06, 0.1, 0.22, 0x9ad7ff));
+    o.push(B(0.1, 0.66, 0.14, 0.3, 0.08, 0.07, jacket));
+    o.push(B(0.1, 0.66, -0.14, 0.3, 0.08, 0.07, jacket));
+    return o;
+  } };
+  VEHICLES.tractor = { len: 1.9, build: function () {
+    var o = [], green = Utils.choice([0x3c9a3c, 0xe8453c, 0x3f7fe0]);
+    o.push(B(0.35, 0.5, 0, 0.95, 0.42, 0.62, green));
+    o.push(B(0.78, 0.5, 0, 0.06, 0.3, 0.5, 0x333333));
+    o.push(B(-0.35, 0.85, 0, 0.56, 0.5, 0.56, Utils.shade(green, 0.1)));
+    o.push(B(-0.35, 0.9, 0, 0.6, 0.3, 0.6, GLASS));
+    o.push(B(-0.35, 1.15, 0, 0.7, 0.06, 0.66, Utils.shade(green, -0.2)));
+    o.push(B(0.7, 0.95, 0.15, 0.07, 0.34, 0.07, 0x333333));
+    o.push(B(-0.62, 0.36, 0.42, 0.72, 0.72, 0.16, DARK));
+    o.push(B(-0.62, 0.36, -0.42, 0.72, 0.72, 0.16, DARK));
+    o.push(B(-0.62, 0.36, 0.51, 0.3, 0.3, 0.04, 0xe0b030));
+    o.push(B(-0.62, 0.36, -0.51, 0.3, 0.3, 0.04, 0xe0b030));
+    o.push(B(0.7, 0.22, 0.36, 0.44, 0.44, 0.12, DARK));
+    o.push(B(0.7, 0.22, -0.36, 0.44, 0.44, 0.12, DARK));
+    o.push(B(0.84, 0.54, 0.2, 0.04, 0.1, 0.12, 0xfff3b0));
+    o.push(B(0.84, 0.54, -0.2, 0.04, 0.1, 0.12, 0xfff3b0));
+    return o;
+  } };
+  VEHICLES.ambulance = { len: 1.7, build: function () {
+    var o = [];
+    o.push(B(0, 0.2, 0, 1.7, 0.1, 0.82, DARK));
+    o.push(B(0, 0.52, 0, 1.7, 0.55, 0.82, 0xffffff));
+    o.push(B(0.1, 0.82, 0, 1.5, 0.08, 0.8, 0xf0f0f0));
+    o.push(B(0.86, 0.64, 0, 0.04, 0.24, 0.66, GLASS));
+    [-1, 1].forEach(function (sz) {
+      o.push(B(0, 0.46, sz * 0.415, 1.6, 0.1, 0.02, 0xe53935));
+      o.push(B(-0.3, 0.64, sz * 0.415, 0.3, 0.08, 0.02, 0xe53935));
+      o.push(B(-0.3, 0.64, sz * 0.415, 0.08, 0.3, 0.02, 0xe53935));
+    });
+    o.push(B(0.5, 0.92, 0.18, 0.18, 0.1, 0.22, 0xe53935));
+    o.push(B(0.5, 0.92, -0.18, 0.18, 0.1, 0.22, 0x2f6fe8));
+    lights(o, 0.86, -0.86, 0.34, 0.27);
+    wheelPair(o, 0.52, 0.42); wheelPair(o, -0.52, 0.42);
+    return o;
+  } };
+  VEHICLES.icecream = { len: 1.8, build: function () {
+    var o = [], body = Utils.choice([0xffc1d9, 0x9ad7ff, 0xfff1b0]);
+    o.push(B(0, 0.2, 0, 1.8, 0.1, 0.82, DARK));
+    o.push(B(0, 0.52, 0, 1.8, 0.6, 0.82, body));
+    o.push(B(0, 0.86, 0, 1.7, 0.08, 0.8, 0xffffff));
+    o.push(B(0.91, 0.64, 0, 0.04, 0.26, 0.66, GLASS));
+    [-1, 1].forEach(function (sz) {
+      o.push(B(-0.2, 0.62, sz * 0.415, 0.5, 0.28, 0.02, 0x8ad0ff));
+      o.push(B(-0.2, 0.8, sz * 0.47, 0.6, 0.05, 0.14, 0xe53935));
+      o.push(B(-0.2, 0.8, sz * 0.47, 0.2, 0.052, 0.142, 0xffffff));
+    });
+    o.push(B(-0.2, 0.96, 0, 0.12, 0.12, 0.12, 0xe0b070));
+    o.push(B(-0.2, 1.06, 0, 0.22, 0.12, 0.22, 0xe0b070));
+    o.push(B(-0.2, 1.2, 0, 0.32, 0.2, 0.32, 0xff9ec4));
+    o.push(B(-0.2, 1.34, 0, 0.1, 0.1, 0.1, 0xe53935));
+    lights(o, 0.91, -0.91, 0.34, 0.27);
+    wheelPair(o, 0.55, 0.42); wheelPair(o, -0.55, 0.42);
+    return o;
+  } };
+  VEHICLES.sports = { len: 1.35, build: function (c) {
+    var o = [];
+    o.push(B(0, 0.16, 0, 1.35, 0.08, 0.8, DARK));
+    o.push(B(0, 0.3, 0, 1.35, 0.2, 0.78, c));
+    o.push(B(-0.12, 0.47, 0, 0.55, 0.16, 0.62, Utils.shade(c, 0.1)));
+    o.push(B(-0.12, 0.47, 0, 0.6, 0.1, 0.66, GLASS));
+    o.push(B(-0.62, 0.5, 0, 0.1, 0.05, 0.74, DARK));
+    o.push(B(-0.6, 0.42, 0.25, 0.05, 0.14, 0.05, DARK));
+    o.push(B(-0.6, 0.42, -0.25, 0.05, 0.14, 0.05, DARK));
+    o.push(B(0.1, 0.405, 0, 1.0, 0.02, 0.2, 0xffffff));
+    lights(o, 0.68, -0.68, 0.3, 0.26);
+    wheelPair(o, 0.42, 0.41, 0.26); wheelPair(o, -0.42, 0.41, 0.26);
+    return o;
+  } };
+
   function pickVehicleKind() {
     return Utils.weightedChoice([
-      { value: 'sedan', weight: 0.36 }, { value: 'taxi', weight: 0.12 }, { value: 'police', weight: 0.06 },
-      { value: 'van', weight: 0.14 }, { value: 'truck', weight: 0.2 }, { value: 'bus', weight: 0.12 }
+      { value: 'sedan', weight: 0.24 }, { value: 'taxi', weight: 0.09 }, { value: 'police', weight: 0.05 },
+      { value: 'van', weight: 0.1 }, { value: 'truck', weight: 0.12 }, { value: 'bus', weight: 0.08 },
+      { value: 'motorbike', weight: 0.09 }, { value: 'tractor', weight: 0.06 }, { value: 'ambulance', weight: 0.04 },
+      { value: 'icecream', weight: 0.04 }, { value: 'sports', weight: 0.07 }
     ]);
   }
 
@@ -260,6 +449,27 @@ var Models = (function () {
       o.push(B(-length / 2 + (i + 0.5) * (length / knots), 0.185, Utils.randRange(-0.15, 0.15), 0.14, 0.02, 0.09, 0x6e4423));
     }
     return o;
+  }
+
+  // A group of n turtles that paddle along; the world makes them dive now and then.
+  function buildTurtles(n) {
+    var o = [];
+    for (var i = 0; i < n; i++) {
+      var x = (i - (n - 1) / 2) * 1.05;
+      o.push(B(x, 0.0, 0, 0.86, 0.2, 0.74, 0x2e6e2c));
+      o.push(B(x, 0.12, 0, 0.7, 0.14, 0.6, 0x3f8f3a));
+      o.push(B(x, 0.19, 0, 0.46, 0.04, 0.4, 0x58b04a));
+      o.push(B(x, 0.215, 0, 0.2, 0.03, 0.2, 0x9be07a));
+      o.push(B(x + 0.5, 0.04, 0, 0.2, 0.14, 0.2, 0xb8d84a));
+      o.push(B(x + 0.6, 0.08, 0.06, 0.04, 0.05, 0.04, 0x111111));
+      o.push(B(x + 0.6, 0.08, -0.06, 0.04, 0.05, 0.04, 0x111111));
+      o.push(B(x + 0.22, -0.04, 0.4, 0.22, 0.05, 0.14, 0xb8d84a));
+      o.push(B(x + 0.22, -0.04, -0.4, 0.22, 0.05, 0.14, 0xb8d84a));
+      o.push(B(x - 0.26, -0.04, 0.38, 0.2, 0.05, 0.12, 0xb8d84a));
+      o.push(B(x - 0.26, -0.04, -0.38, 0.2, 0.05, 0.12, 0xb8d84a));
+      o.push(B(x - 0.46, 0.0, 0, 0.1, 0.06, 0.06, 0xb8d84a));
+    }
+    return Utils.voxelMesh(o);
   }
 
   var _padGeo = null, _padMat = null, _flowerMat = null, _flowerGeo = null;
@@ -339,32 +549,40 @@ var Models = (function () {
     return o;
   }
 
-  var _lampOn = null, _lampOff = null, _lampGeo = null;
-  // Railway warning signal: returns {group, lamp}; the caller toggles lamp.material.
+  var _sig = null;
+  function signalAssets() {
+    if (_sig) return _sig;
+    function basic(c) { var m = new THREE.MeshBasicMaterial({ color: c }); m.__shared = true; return m; }
+    _sig = {
+      geo: new THREE.BoxGeometry(0.22, 0.22, 0.05),
+      redOn: basic(0xff2a2a), redOff: basic(0x4a1010), greenOn: basic(0x35ff6a), greenOff: basic(0x0f3d1a)
+    };
+    _sig.geo.__shared = true;
+    return _sig;
+  }
+
+  // Railway signal like a little traffic light: GREEN = the track is clear,
+  // flashing RED = a train is on its way. The caller swaps the lamp materials.
   function buildSignal() {
-    if (!_lampOn) {
-      _lampOn = new THREE.MeshBasicMaterial({ color: 0xff3030 });
-      _lampOff = new THREE.MeshBasicMaterial({ color: 0x5c1414 });
-      _lampOn.__shared = _lampOff.__shared = true;
-      _lampGeo = new THREE.BoxGeometry(0.2, 0.2, 0.06);
-      _lampGeo.__shared = true;
-    }
+    var A = signalAssets();
     var g = new THREE.Group();
-    var post = Utils.voxelMesh([
-      B(0, 0.5, 0, 0.1, 1.0, 0.1, 0x8a8d96),
-      B(0, 1.12, 0, 0.5, 0.34, 0.14, 0xf2f2f2),
-      B(0, 1.12, 0.02, 0.5, 0.06, 0.16, 0xe53935),
-      B(0, 1.34, 0, 0.16, 0.06, 0.16, 0x2b2b30)
-    ]);
-    g.add(post);
-    var lampA = new THREE.Mesh(_lampGeo, _lampOff);
-    lampA.position.set(-0.11, 1.12, -0.09);
-    var lampB = new THREE.Mesh(_lampGeo, _lampOff);
-    lampB.position.set(0.11, 1.12, -0.09);
-    g.add(lampA); g.add(lampB);
-    var lampA2 = lampA.clone(); lampA2.position.z = 0.09; g.add(lampA2);
-    var lampB2 = lampB.clone(); lampB2.position.z = 0.09; g.add(lampB2);
-    return { group: g, lamps: [[lampA, lampA2], [lampB, lampB2]], on: _lampOn, off: _lampOff };
+    g.add(Utils.voxelMesh([
+      B(0, 0.05, 0, 0.3, 0.1, 0.3, 0x555a63),
+      B(0, 0.7, 0, 0.1, 1.3, 0.1, 0x8a8d96),
+      B(0, 1.4, 0, 0.36, 0.66, 0.18, 0x23262b),
+      B(0, 1.76, 0, 0.42, 0.06, 0.24, 0xe53935),
+      B(0, 1.73, 0, 0.06, 0.1, 0.06, 0x23262b)
+    ]));
+    var red = [], green = [];
+    [-1, 1].forEach(function (sz) {
+      var r = new THREE.Mesh(A.geo, A.redOff);
+      r.position.set(0, 1.54, sz * 0.105);
+      var gr = new THREE.Mesh(A.geo, A.greenOn);
+      gr.position.set(0, 1.26, sz * 0.105);
+      g.add(r); g.add(gr);
+      red.push(r); green.push(gr);
+    });
+    return { group: g, red: red, green: green, mats: A };
   }
 
   // ---------------------------------------------------------------------
@@ -454,6 +672,8 @@ var Models = (function () {
     g.add(buildSignal().group);
     g.add(buildPad(true));
     g.add(buildBeam(1.2));
+    g.add(buildTurtles(2));
+    g.add(Utils.voxelMesh([B(0, 0.1, 0, 0.1, 0.2, 0.1, 0x3f9f4b)], { material: sceneryMaterial() }));
     Object.keys(CONFIG.POWERUPS).forEach(function (k) { g.add(buildPowerup(k)); });
     g.position.set(0, 0, 0);
     return g;
@@ -492,6 +712,10 @@ var Models = (function () {
 
   return {
     treeBoxes: treeBoxes,
+    obstacleBoxes: obstacleBoxes,
+    sceneryMaterial: sceneryMaterial,
+    setWind: function (t) { _windU.value = t; },
+    buildTurtles: buildTurtles,
     rockBoxes: rockBoxes,
     bushBoxes: bushBoxes,
     flowerBoxes: flowerBoxes,

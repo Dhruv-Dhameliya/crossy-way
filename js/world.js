@@ -14,12 +14,13 @@ function World(scene) {
   this.onMagnetCoin = null;
   this.listener = null;  // {x, z, ghost}: where the chicken is (for sounds and close calls)
   this.onNearMiss = null;
+  this.view = null;      // {x, z, right, rx, rz}: what the camera sees (the game updates it)
   this.hornCool = 0;
   this.amb = { traffic: 0 }; // 1 while the chicken's lane (or the next) is a road, drives the road hum
 }
 
 World.prototype.difficultyProgress = function (z) {
-  return Utils.clamp(z / 180, 0, 1);
+  return Utils.clamp(z / Difficulty.cur.ramp, 0, 1);
 };
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,8 @@ World.prototype.nextBand = function (z) {
       dir: Math.random() < 0.5 ? 1 : -1,
       pads: type === T.WATER && z > 14 && Math.random() < 0.3
     };
+    // some rivers are full of turtles that dive now and then
+    band.turtles = type === T.WATER && !band.pads && z > 22 && Math.random() < 0.26 * Difficulty.cur.special;
   }
   this.band = band;
 };
@@ -118,7 +121,7 @@ World.prototype.generateRow = function (z) {
 
   if (type === T.GRASS) this.populateGrass(row, z, p);
   else if (type === T.ROAD) this.populateRoad(row, dir, p);
-  else if (type === T.WATER) this.populateWater(row, dir, p, band.pads);
+  else if (type === T.WATER) this.populateWater(row, dir, p, band.pads, band.turtles);
   else this.populateRail(row);
 
   this.rows.set(z, row);
@@ -155,10 +158,7 @@ World.prototype.populateGrass = function (row, z, p) {
       continue;
     }
     if (Math.random() < density) {
-      var r = Math.random();
-      if (r < 0.55) Models.treeBoxes(boxes, x, 0, Utils.randInt(0, 3));
-      else if (r < 0.75) Models.rockBoxes(boxes, x, 0);
-      else Models.bushBoxes(boxes, x, 0);
+      Models.obstacleBoxes(boxes, x, 0); // tree, rock, bush, hay bale, fence, scarecrow, stump, barrels, sunflower, mushroom
       row.blocked[x] = true;
     } else if (Math.random() < 0.07) {
       Models.flowerBoxes(boxes, x, 0);
@@ -178,7 +178,7 @@ World.prototype.populateGrass = function (row, z, p) {
       }
     });
   }
-  if (boxes.length) row.group.add(Utils.voxelMesh(boxes));
+  if (boxes.length) row.group.add(Utils.voxelMesh(boxes, { material: Models.sceneryMaterial() })); // sways in the wind
 
   if (z > 0) {
     var r = Math.random();
@@ -263,7 +263,7 @@ function layoutLoop(lengths, loopLen, minGap) {
 }
 
 // Relative pace by vehicle type: big rigs are a bit slower, taxis and cops hurry.
-var VEHICLE_PACE = { truck: 0.85, bus: 0.8, van: 0.95, sedan: 1.1, taxi: 1.25, police: 1.4 };
+var VEHICLE_PACE = { truck: 0.85, bus: 0.8, van: 0.95, sedan: 1.1, taxi: 1.25, police: 1.4, motorbike: 1.5, tractor: 0.55, ambulance: 1.4, icecream: 0.8, sports: 1.8 };
 var SPEED_FLOOR = 2.8;   // nothing crawls
 var SPEED_CEIL = 11;
 
@@ -271,7 +271,8 @@ var SPEED_CEIL = 11;
 // it leaves: no slowing down, no speeding up, no braking near the chicken.
 World.prototype.rollVehicle = function (row) {
   var kind = Models.pickVehicleKind();
-  var speed = Utils.clamp(row.laneBase * VEHICLE_PACE[kind] * Utils.randRange(0.6, 1.55), SPEED_FLOOR, SPEED_CEIL);
+  var D = Difficulty.cur;
+  var speed = Utils.clamp(row.laneBase * VEHICLE_PACE[kind] * Utils.randRange(1.075 - 0.475 * (D.spread || 1), 1.075 + 0.475 * (D.spread || 1)), Math.max(2.0, SPEED_FLOOR * D.speed), SPEED_CEIL * D.speed);
   return { kind: kind, len: Models.vehicleLength(kind), speed: speed };
 };
 
@@ -279,19 +280,20 @@ World.prototype.rollVehicle = function (row) {
 // so a new vehicle only enters once there is enough room that it cannot catch
 // the one ahead before that one leaves the lane. Returns that required gap.
 World.prototype.requiredGap = function (row, lead, cand) {
-  var minGap = 2.2 + 0.18 * cand.speed;
+  var D = Difficulty.cur;
+  var minGap = (2.2 + 0.18 * cand.speed) / Math.sqrt(D.traffic);
   if (!lead || cand.speed <= lead.speed) return minGap;
   var L = row.laneLen;
   var tLead = Math.max(0, (L + lead.halfWidth - lead.s) / lead.speed);
   var tSelf = (L + cand.len) / cand.speed;
-  return minGap + (cand.speed - lead.speed) * Math.min(tLead, tSelf);
+  return minGap + (cand.speed - lead.speed) * Math.min(tLead, tSelf); // never scaled down: this is what keeps vehicles from ever overlapping
 };
 
 World.prototype.populateRoad = function (row, dir, p) {
   row.dir = dir;
   row.laneLen = CONFIG.LANE_HALF * 2;
-  row.laneBase = Utils.randRange(3.2 + p * 1.2, 6.4 + p * 2.6); // lane tempo
-  row.density = 1 - p * 0.25;
+  row.laneBase = Utils.randRange(3.2 + p * 1.2, 6.4 + p * 2.6) * Difficulty.cur.speed; // lane tempo
+  row.density = (1 - p * 0.25) / Difficulty.cur.traffic; // smaller = more crowded
   row.wantGap = Utils.randRange(3.4, 9.5) * row.density;
   row.pending = null;
   row.live = false;
@@ -328,19 +330,27 @@ World.prototype.laneStep = function (row, dt) {
       continue;
     }
     v.x = dir > 0 ? v.s - wrap : wrap - v.s;
-    if (v.mesh) v.mesh.position.x = v.x;
+    if (v.mesh) {
+      v.mesh.position.x = v.x;
+      // a little suspension bounce and body roll, livelier the faster they go
+      var tm = this.time, sp = Math.min(1.5, v.cur / 4);
+      v.mesh.position.y = row.top + Math.sin(tm * (7 + v.cur * 0.8) + v.ph) * 0.012 * sp;
+      v.mesh.rotation.z = Math.sin(tm * (5 + v.cur * 0.5) + v.ph * 1.7) * 0.014 * sp;
+    }
   }
   if (frozen) return; // no new traffic while time is frozen
 
   if (!row.pending) row.pending = this.rollVehicle(row);
   var cand = row.pending;
   var lead = vs.length ? vs[vs.length - 1] : null; // the most recent arrival
+  // a newcomer may only be a little faster than the vehicle ahead (keeps roads busy, not empty)
+  if (lead && cand.speed > lead.speed * 1.35) cand.speed = Math.max(Math.max(2.0, SPEED_FLOOR * Difficulty.cur.speed), lead.speed * 1.35);
   var gap0 = lead ? lead.s - lead.halfWidth : Infinity; // room between the entry line and the last vehicle
   var need = lead ? Math.max(row.wantGap, this.requiredGap(row, lead, cand)) : 0;
   if (gap0 >= need) {
     var v2 = {
       kind: cand.kind, speed: cand.speed, cur: cand.speed, halfWidth: cand.len / 2,
-      s: -cand.len / 2, x: 0, mesh: null, heard: 0
+      s: -cand.len / 2, x: 0, mesh: null, heard: 0, ph: Math.random() * 6.28
     };
     v2.x = dir > 0 ? v2.s - wrap : wrap - v2.s;
     vs.push(v2);
@@ -350,7 +360,8 @@ World.prototype.laneStep = function (row, dt) {
   }
 };
 
-var HORN_CHANCE = { truck: 0.6, bus: 0.5, taxi: 0.5, police: 0.3, van: 0.25, sedan: 0.2 };
+var HORN_CHANCE = { truck: 0.6, bus: 0.5, taxi: 0.5, police: 0.3, van: 0.25, sedan: 0.2, motorbike: 0.35, tractor: 0.5, sports: 0.4 };
+var SPECIAL_SOUND = { ambulance: 'siren', icecream: 'jingle' }; // signature sounds
 
 World.prototype.updateRoad = function (row, dt) {
   this.laneStep(row, dt);
@@ -377,10 +388,13 @@ World.prototype.vehicleAudio = function (row) {
       if (!passedBy && clear > 0 && clear < 0.9) { v.tracked = true; v.minD = Math.min(v.minD === undefined ? 9 : v.minD, clear); }
       else if (passedBy && v.tracked && v.minD < 0.55) { v.nm = true; v.tracked = false; this.onNearMiss(v, row); }
     }
-    var big = v.kind === 'truck' || v.kind === 'bus';
+    var big = v.kind === 'truck' || v.kind === 'bus' || v.kind === 'tractor';
     if (dx * row.dir < 0 && adx < 6 && !(v.heard & 1)) { // approaching
       v.heard |= 1;
-      if (this.hornCool <= 0 && Math.random() < HORN_CHANCE[v.kind]) {
+      var special = SPECIAL_SOUND[v.kind];
+      if (special) {
+        if (this.hornCool <= 0) { this.hornCool = 1.4; GameAudio[special](vol); }
+      } else if (this.hornCool <= 0 && Math.random() < HORN_CHANCE[v.kind]) {
         this.hornCool = 0.8;
         GameAudio.carHorn(vol, big);
       }
@@ -392,11 +406,12 @@ World.prototype.vehicleAudio = function (row) {
   }
 };
 
-World.prototype.populateWater = function (row, dir, p, pads) {
+World.prototype.populateWater = function (row, dir, p, pads, turtles) {
   if (pads) return this.populatePads(row);
+  if (turtles) return this.populateTurtles(row, dir, p);
   var wrap = CONFIG.LANE_HALF;
   var loopLen = wrap * 2;
-  var speed = Utils.randRange(1.1 + p * 1.2, 2.0 + p * 1.8);
+  var speed = Utils.randRange(1.1 + p * 1.2, 2.0 + p * 1.8) * Difficulty.cur.speed;
   var spacing = Utils.randRange(5.5, 8.5);
   var count = Math.max(4, Math.round(loopLen / spacing));
   var lengths = [];
@@ -412,6 +427,32 @@ World.prototype.populateWater = function (row, dir, p, pads) {
     row.logs.push({
       mesh: mesh, x: centers[j], halfWidth: lengths[j] / 2, speed: speed, direction: dir,
       baseY: -0.12, top: 0.05, dip: 0, bob: 0, phase: Math.random() * 6.28
+    });
+  }
+};
+
+// Turtle river: groups of turtles paddle along, but every so often they
+// shake (a warning), then dive underwater for a couple of seconds - get off!
+World.prototype.populateTurtles = function (row, dir, p) {
+  var wrap = CONFIG.LANE_HALF;
+  var loopLen = wrap * 2;
+  var speed = Utils.randRange(1.0 + p * 0.8, 1.7 + p * 1.2) * Difficulty.cur.speed;
+  var count = Math.max(5, Math.round(loopLen / Utils.randRange(5.5, 7.5)));
+  var lengths = [];
+  for (var i = 0; i < count; i++) lengths.push(Utils.weightedChoice([{ value: 2, weight: 0.55 }, { value: 3, weight: 0.45 }]));
+  var centers = layoutLoop(lengths, loopLen, 1.6);
+  row.loop = { wrap: wrap, len: loopLen };
+  for (var j = 0; j < centers.length; j++) {
+    var n = lengths[j];
+    var mesh = Models.buildTurtles(n);
+    mesh.position.set(centers[j], -0.12, 0);
+    mesh.rotation.y = dir > 0 ? 0 : Math.PI;
+    row.group.add(mesh);
+    var cycle = Utils.randRange(7, 11);
+    row.logs.push({
+      mesh: mesh, x: centers[j], halfWidth: n * 1.05 / 2, speed: speed, direction: dir,
+      baseY: -0.12, top: 0.08, dip: 0, bob: 0, phase: Math.random() * 6.28,
+      turtle: true, cycle: cycle, t0: Utils.randRange(0, cycle), sink: 0, wob: 0, submerged: false, bubbled: false
     });
   }
 };
@@ -455,15 +496,15 @@ World.prototype.populateRail = function (row) {
   ], { castShadow: false }));
 
   var sig = Models.buildSignal();
-  sig.group.position.set(-PH - 1.4, row.top, -0.42);
+  sig.group.position.set(-PH - 1.4, row.top, -0.5);
   var sig2 = Models.buildSignal();
-  sig2.group.position.set(PH + 1.4, row.top, -0.42);
+  sig2.group.position.set(PH + 1.4, row.top, -0.5);
   row.group.add(sig.group);
   row.group.add(sig2.group);
 
   row.train = {
     phase: 'idle',
-    timer: Utils.randRange(1.5, 5.0),
+    timer: Utils.randRange(1.5, 5.0) * Difficulty.cur.train,
     direction: Utils.choice([-1, 1]),
     mesh: null,
     signals: [sig, sig2],
@@ -473,11 +514,27 @@ World.prototype.populateRail = function (row) {
   if (Math.random() < 0.16) this.placeCoin(row, false);
 };
 
-World.prototype.setSignals = function (train, lampAOn, lampBOn) {
-  train.signals.forEach(function (s) {
-    s.lamps[0].forEach(function (m) { m.material = lampAOn ? s.on : s.off; });
-    s.lamps[1].forEach(function (m) { m.material = lampBOn ? s.on : s.off; });
+// mode 'clear' = green (no train), 'red' = red lamps lit or dark (flashing = a train is coming)
+World.prototype.setSignals = function (train, mode, blinkOn) {
+  var clear = mode === 'clear';
+  train.signals.forEach(function (sg) {
+    sg.green.forEach(function (m) { m.material = clear ? sg.mats.greenOn : sg.mats.greenOff; });
+    sg.red.forEach(function (m) { m.material = !clear && blinkOn ? sg.mats.redOn : sg.mats.redOff; });
   });
+};
+
+// Keep the two signal posts near the left / right edges of what is on screen, so
+// you always see them (the playing field is wider than a phone screen).
+World.prototype.placeSignals = function (row) {
+  var v = this.view;
+  if (!v) return;
+  var dz = row.z - v.z;
+  var lim = CONFIG.PLAY_HALF + 1.4;
+  var xa = v.x + (v.right - v.rz * dz) / v.rx;
+  var xb = v.x + (-v.right - v.rz * dz) / v.rx;
+  var sg = row.train.signals;
+  sg[0].group.position.x = Utils.clamp(Math.min(xa, xb), -lim, lim);
+  sg[1].group.position.x = Utils.clamp(Math.max(xa, xb), -lim, lim);
 };
 
 World.prototype.spawnTrain = function (row) {
@@ -493,7 +550,7 @@ World.prototype.spawnTrain = function (row) {
   var wrap = CONFIG.LANE_HALF + 4;
   var length = segCount * seg;
   t.length = length;
-  t.speed = Utils.randRange(17, 24);
+  t.speed = Utils.randRange(17, 24) * Math.sqrt(Difficulty.cur.speed);
   t.x = t.direction > 0 ? -wrap : wrap;
   g.position.set(t.x, row.top, 0);
   g.rotation.y = t.direction > 0 ? 0 : Math.PI;
@@ -518,6 +575,7 @@ World.prototype.update = function (dt, centerZ, playerZ, budget) {
   var mg = this.magnet;
   var nearRoad = 99;
   this.hornCool -= dt;
+  Models.setWind(time);
 
   this.rows.forEach(function (row) {
     var rel = row.z - playerZ; // playerZ is the chicken's row
@@ -561,14 +619,34 @@ World.prototype.update = function (dt, centerZ, playerZ, budget) {
         }
         l.dip += (0 - l.dip) * (1 - Math.exp(-dt * 9));
         l.bob = Math.sin(time * 2.1 + l.phase) * 0.018;
-        l.mesh.position.y = l.baseY + l.bob - l.dip;
+        if (l.turtle) self.updateTurtle(row, l, dt, time);
+        l.mesh.position.y = l.baseY + l.bob - l.dip - (l.sink || 0) + (l.wob || 0);
+        l.curTop = l.top + l.bob - l.dip - (l.sink || 0) + (l.wob || 0); // what the chicken stands on
+        if (l.pad || l.turtle) l.mesh.rotation.z = Math.sin(time * 1.6 + l.phase) * 0.02;
       }
     } else if (row.type === T.RAIL) {
       self.updateTrain(row, dt, vol);
+      self.placeSignals(row);
     }
   });
 
   this.amb.traffic = nearRoad === 0 ? 1 : 0;
+};
+
+// One turtle group: surface -> shake (warning) -> dive -> pop back up.
+World.prototype.updateTurtle = function (row, l, dt, time) {
+  var tt = (time + l.t0) % l.cycle;
+  var warnStart = l.cycle - 3.2, diveStart = l.cycle - 2.0, riseStart = l.cycle - 0.6;
+  var target = 0;
+  l.wob = 0;
+  if (tt >= warnStart && tt < diveStart) { target = 0.06; l.wob = Math.sin(time * 38) * 0.022; }
+  else if (tt >= diveStart && tt < riseStart) target = 0.62;
+  l.sink += (target - l.sink) * (1 - Math.exp(-dt * 9));
+  l.submerged = l.sink > 0.3;
+  if (tt >= diveStart && tt < riseStart && !l.bubbled) {
+    l.bubbled = true;
+    Particles.burst(l.x, row.top + 0.02, row.z, { colors: [0xffffff, 0xcfeeff, 0x9be0ff], count: 8, speed: 1.4, up: 2.2, size: 0.09, life: 0.6, gravity: 2, spread: l.halfWidth, floor: row.top });
+  } else if (tt < warnStart) l.bubbled = false;
 };
 
 // Magnet: coins near the player fly in, and are collected on arrival.
@@ -626,8 +704,8 @@ World.prototype.blast = function (px, pz, radius) {
         destroyed += 3;
       }
       t.phase = 'idle';
-      t.timer = Utils.randRange(4, 8);
-      self.setSignals(t, false, false);
+      t.timer = Utils.randRange(4, 8) * Difficulty.cur.train;
+      self.setSignals(t, 'clear');
     }
   });
   return destroyed;
@@ -643,7 +721,7 @@ World.prototype.updateTrain = function (row, dt, vol) {
   if (t.phase === 'idle') {
     if (t.timer <= 0) {
       t.phase = 'warning';
-      t.timer = 1.9;
+      t.timer = Difficulty.cur.trainWarn;
       t.warnPulse = 0;
       t.ding = -1;
       t.toot = false;
@@ -653,7 +731,7 @@ World.prototype.updateTrain = function (row, dt, vol) {
     t.warnPulse += dt;
     var step = Math.floor(t.warnPulse * 3);
     var blink = step % 2 === 0;
-    this.setSignals(t, blink, !blink);
+    this.setSignals(t, 'red', blink); // flashing red: a train is coming
     if (step !== t.ding) {
       t.ding = step;
       if (vol > 0 && GameAudio) GameAudio.bell(blink, vol);
@@ -669,7 +747,7 @@ World.prototype.updateTrain = function (row, dt, vol) {
     }
   } else if (t.phase === 'crossing') {
     var flash = Math.floor(this.time * 6) % 2 === 0;
-    this.setSignals(t, flash, !flash);
+    this.setSignals(t, 'red', flash);
     if (vol > 0 && GameAudio && Math.floor(this.time * 3) !== t.ding) {
       t.ding = Math.floor(this.time * 3);
       GameAudio.bell(flash, vol * 0.7);
@@ -688,9 +766,9 @@ World.prototype.updateTrain = function (row, dt, vol) {
       Utils.disposeObject3D(t.mesh);
       t.mesh = null;
       t.phase = 'idle';
-      t.timer = Utils.randRange(4, 9);
+      t.timer = Utils.randRange(4, 9) * Difficulty.cur.train;
       t.direction = Utils.choice([-1, 1]);
-      this.setSignals(t, false, false);
+      this.setSignals(t, 'clear'); // green again
     }
   }
 };
@@ -737,7 +815,7 @@ World.prototype.getLogAt = function (x, z) {
   if (!row || row.type !== CONFIG.ROW_TYPES.WATER) return null;
   for (var i = 0; i < row.logs.length; i++) {
     var l = row.logs[i];
-    if (Math.abs(l.x - x) < l.halfWidth + 0.1) return l;
+    if (!l.submerged && Math.abs(l.x - x) < l.halfWidth + 0.1) return l;
   }
   return null;
 };

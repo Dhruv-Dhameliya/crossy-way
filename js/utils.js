@@ -86,11 +86,17 @@ var Utils = {
       if (b.rx || b.ry || b.rz) {
         g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(b.rx || 0, b.ry || 0, b.rz || 0)));
       }
-      g.translate(b.x || 0, b.y || 0, b.z || 0);
       var c = new THREE.Color(b.color);
       var n = g.attributes.position.count;
       var arr = new Float32Array(n * 3);
-      for (var i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+      // baked "ambient occlusion": the bottom of every box is a touch darker, which
+      // grounds objects and gives the voxels more depth
+      var pos = g.attributes.position;
+      for (var i = 0; i < n; i++) {
+        var k = 0.84 + 0.16 * Math.min(1, Math.max(0, (pos.getY(i) + b.h / 2) / b.h));
+        arr[i * 3] = c.r * k; arr[i * 3 + 1] = c.g * k; arr[i * 3 + 2] = c.b * k;
+      }
+      g.translate(b.x || 0, b.y || 0, b.z || 0);
       g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
       return g;
     });

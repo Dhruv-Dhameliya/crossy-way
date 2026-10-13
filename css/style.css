@@ -817,3 +817,124 @@ body.no-touch #dpad [data-dir="up"] { grid-area: u; }
 body.no-touch #dpad [data-dir="left"] { grid-area: l; }
 body.no-touch #dpad [data-dir="right"] { grid-area: r; }
 body.no-touch #dpad [data-dir="down"] { grid-area: d; }
+
+/* =====================================================================
+   v5: compact home, info panel, 3-button game over, difficulty
+   ===================================================================== */
+
+/* ---- home screen ---- */
+.menu-row.icons { gap: 8px; align-items: center; }
+.menu-btn.info { background: linear-gradient(#5fd0ff, #2a98d8); box-shadow: 0 5px 0 #1b6b9a; }
+.menu-btn.mode {
+  font-size: clamp(11px, 3vw, 13px); padding: 0.55em 0.95em 0.6em;
+  background: linear-gradient(#5aa5ff, #2f74e0); box-shadow: 0 5px 0 #1f4fa0;
+}
+.menu-btn.mode[data-mode="easy"] { background: linear-gradient(#7ed957, #4aa72f); box-shadow: 0 5px 0 #3a8a26; }
+.menu-btn.mode[data-mode="hard"] { background: linear-gradient(#ffb02e, #f08a00); box-shadow: 0 5px 0 #b86a00; }
+.menu-btn.mode[data-mode="extreme"] { background: linear-gradient(#ff6b6f, #c8242c); box-shadow: 0 5px 0 #8e1b18; }
+html[data-title-font="pixel"] .menu-btn.mode { font-size: 9px; }
+
+@media (max-height: 640px) {
+  #startPanel { padding-top: calc(2.5vh + var(--safe-t)); gap: 7px; }
+  .hero-chick { width: 42px; }
+  .logo { --size: min(11vw, 9vh, 76px); }
+  .ribbon { margin-top: 0.35em; }
+  .play-btn { font-size: clamp(20px, 4vw, 26px); }
+}
+/* short landscape phones: drop the decorations, keep everything reachable */
+@media (max-height: 460px) {
+  .hero-chick, .ribbon { display: none; }
+  #startPanel { padding-top: calc(8px + var(--safe-t)); gap: 6px; }
+  .logo { --size: min(8vw, 14vh, 60px); }
+  .play-btn { font-size: 20px; padding: 0.3em 1.2em 0.38em; border-width: 3px; }
+  .menu-btn { font-size: 12px; }
+}
+
+/* ---- info panel ---- */
+.info-card { width: min(480px, 94vw); text-align: left; }
+.info-card h2 { text-align: center; }
+.info-list { list-style: none; display: flex; flex-direction: column; gap: 7px; font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--ink); }
+.info-list li { background: #f4fbec; border: 2px solid #dcebd0; border-radius: 14px; padding: 7px 10px; }
+.info-card .pg-grid { grid-template-columns: repeat(2, 1fr); }
+.info-card .pg-item { background: #f4fbec; color: var(--ink); border-color: var(--c); }
+.info-card .pg-item small { display: block !important; opacity: 0.75; }
+.sig { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 50%; vertical-align: -0.1em; border: 2px solid #23262b; margin: 0 0.1em; }
+.sig.green { background: #35ff6a; box-shadow: 0 0 6px #35ff6a; }
+.sig.red { background: #ff2a2a; box-shadow: 0 0 6px #ff2a2a; animation: pulseScale 0.4s ease-in-out infinite alternate; }
+
+/* ---- game over: score + share / play again / home ---- */
+.go-card { gap: 14px; padding-bottom: 20px; }
+.go-row { display: grid; grid-template-columns: 1fr 1.55fr 1fr; gap: 10px; width: 100%; align-items: stretch; }
+.go-row button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font-family: var(--title-font);
+  border: 4px solid var(--ink); border-radius: 22px;
+  color: #fff; cursor: pointer;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+  padding: 10px 4px 12px;
+  font-size: clamp(11px, 3.2vw, 14px); line-height: 1.1;
+}
+.go-row .gi { font-size: 22px; line-height: 1; }
+.go-row #restartBtn {
+  font-size: clamp(14px, 4.2vw, 18px); padding: 16px 6px 18px;
+  background: linear-gradient(#7ed957, #4aa72f); box-shadow: 0 6px 0 var(--green-d);
+  animation: playPulse 0.9s ease-in-out infinite alternate;
+}
+.go-row #restartBtn .gi { font-size: 30px; }
+.go-row .share-btn { background: linear-gradient(#5aa5ff, #2f74e0); box-shadow: 0 6px 0 #1f4fa0; }
+.go-row .home-btn { background: linear-gradient(#ffb02e, #f08a00); box-shadow: 0 6px 0 #b86a00; }
+.go-row button:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); animation: none; }
+html[data-title-font="pixel"] .go-row button { font-size: 9px; }
+html[data-title-font="pixel"] .go-row #restartBtn { font-size: 11px; }
+.is-record .go-ribbon {
+  background: linear-gradient(100deg, #ffd93d 0%, #fff3a8 45%, #ffd93d 60%, #ffb400 100%);
+  background-size: 220% 100%;
+  color: #6b3d00; text-shadow: none;
+  animation: gold 1.6s linear infinite, ribbonShake 0.5s 0.45s;
+}
+
+/* ---- settings: 5 tabs + difficulty ---- */
+.set-tabs { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.set-tab { font-size: 10px; padding: 6px 1px 5px; }
+.set-tab .ti { font-size: 18px; }
+.diff-row .diff-btn { flex: 1 1 calc(50% - 4px); }
+
+/* narrow phones: keep the home content clear of the score / TOP chip in the top-left corner */
+@media (max-width: 480px) { #startPanel { padding-top: calc(84px + var(--safe-t)); } }
+
+/* =====================================================================
+   D-pad size slider + live preview
+   ===================================================================== */
+:root { --dpad-scale: 1; }
+#dpad .dp-group { gap: calc(14px * var(--dpad-scale)); }
+#dpad .dpad-btn {
+  width: calc(60px * var(--dpad-scale)); height: calc(60px * var(--dpad-scale));
+  font-size: calc(22px * var(--dpad-scale));
+}
+body.touch #dpad .dpad-btn {
+  width: calc(clamp(72px, 19vw, 90px) * var(--dpad-scale)); height: calc(clamp(72px, 19vw, 90px) * var(--dpad-scale));
+  font-size: calc(clamp(26px, 7vw, 34px) * var(--dpad-scale)); border-radius: calc(24px * var(--dpad-scale));
+}
+
+.size-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.size-row small { font-size: 11px; font-weight: 700; color: #6b8a5a; }
+.mini-btn {
+  font-family: var(--body-font); font-size: 12px; font-weight: 700;
+  padding: 4px 12px; border: 2px solid #cfe3c2; border-radius: 12px;
+  background: #f4fbec; color: var(--ink); cursor: pointer;
+}
+.mini-btn:active { transform: translateY(2px); }
+
+/* Preview: the D-pad shows above the menu, the card melts away except the slider */
+body.modal-open.dpad-previewing #dpad { display: block !important; }
+body.modal-open.no-touch.dpad-previewing #dpad { display: grid !important; }
+body.dpad-previewing #dpad .dpad-btn { pointer-events: none; opacity: 0.9; }
+.settings-panel { transition: background 0.2s; }
+.settings-panel.previewing { background: rgba(8, 28, 6, 0.22); }
+.set-card, .set-card > *, .set-sec > .setting-group { transition: opacity 0.18s, background 0.18s, box-shadow 0.18s, border-color 0.18s; }
+.settings-panel.previewing .set-card { background: transparent; border-color: transparent; box-shadow: none; }
+.settings-panel.previewing .set-card > *,
+.settings-panel.previewing .set-sec > .setting-group:not(.dpad-size-group) { opacity: 0.06; pointer-events: none; }
+.settings-panel.previewing .set-card > .set-sec.active { opacity: 1; pointer-events: auto; }
+.settings-panel.previewing .dpad-size-group { pointer-events: auto; }
+.settings-panel.previewing .dpad-size-group { opacity: 1; background: #ffffff; border: 4px solid var(--ink); border-radius: 18px; padding: 10px 12px; box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3); }

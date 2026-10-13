@@ -52,7 +52,31 @@ var Weather = (function () {
     rainLines.visible = false;
     scene.add(rainLines);
     for (var i = 0; i < RAIN_MAX; i++) rainVel[i] = Utils.randRange(20, 28);
+    initClouds();
   }
+
+  // Drifting cloud SHADOWS: invisible boxes high up that only cast shadows, so soft
+  // dark patches roll across the fields (they never block the view).
+  var clouds = [], cloudGroup = null, cloudT = 0;
+  function initClouds() {
+    cloudGroup = new THREE.Group();
+    var mat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+    for (var i = 0; i < 7; i++) {
+      var boxes = [];
+      var w = Utils.randRange(4, 7), d = Utils.randRange(3, 5);
+      boxes.push({ x: 0, y: 0, z: 0, w: w, h: 1, d: d, color: 0xffffff });
+      boxes.push({ x: w * 0.3, y: 0.2, z: d * 0.2, w: w * 0.55, h: 1, d: d * 0.7, color: 0xffffff });
+      boxes.push({ x: -w * 0.28, y: 0.1, z: -d * 0.25, w: w * 0.5, h: 1, d: d * 0.6, color: 0xffffff });
+      var mesh = new THREE.Mesh(Utils.voxelGeometry(boxes), mat);
+      mesh.castShadow = true;
+      mesh.frustumCulled = false;
+      mesh.position.y = Utils.randRange(9, 12);
+      cloudGroup.add(mesh);
+      clouds.push({ mesh: mesh, ox: Utils.randRange(-26, 26), oz: Utils.randRange(-26, 26), vx: Utils.randRange(0.5, 1.0), vz: Utils.randRange(0.15, 0.5) });
+    }
+    scene.add(cloudGroup);
+  }
+  function wrap52(v) { return ((v + 26) % 52 + 52) % 52 - 26; }
 
   function pickAutoWeather(rows) {
     var r = Math.random();
@@ -126,10 +150,23 @@ var Weather = (function () {
     scene.fog.near = Utils.lerp(30, 11, fogAmt);
     scene.fog.far = Utils.lerp(56, 32, fogAmt);
     ambient.color.copy(cur.ambC);
-    ambient.intensity = cur.ambI * (1 - 0.16 * rain - 0.1 * fog) + flash * 0.9;
+    // hemisphere light: the sky colour on top faces, a darker warm bounce below
+    if (ambient.groundColor) ambient.groundColor.setRGB(ambient.color.r * 0.55, ambient.color.g * 0.62, ambient.color.b * 0.5);
+    ambient.intensity = cur.ambI * (ambient.groundColor ? 1.1 : 1) * (1 - 0.16 * rain - 0.1 * fog) + flash * 0.9;
     sun.color.copy(cur.sunC);
     sun.intensity = cur.sunI * (1 - 0.55 * rain - 0.3 * fog) + flash * 0.5;
     if (Models.setNight) Models.setNight(cur.night);
+
+    // ---- cloud shadows drift past (only worth drawing when shadows are on) ----
+    cloudT += dt;
+    cloudGroup.visible = !!sun.castShadow && sun.intensity > 0.2;
+    if (cloudGroup.visible) {
+      for (var ci = 0; ci < clouds.length; ci++) {
+        var c = clouds[ci];
+        c.mesh.position.x = camX + wrap52(c.ox + cloudT * c.vx);
+        c.mesh.position.z = camZ + wrap52(c.oz + cloudT * c.vz);
+      }
+    }
 
     // ---- rain streaks ----
     var on = rain > 0.03;

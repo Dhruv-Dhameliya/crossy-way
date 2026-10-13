@@ -7,10 +7,15 @@ A fast, colourful hopping game. Guide a little chicken across endless roads, riv
 - **Hop forward** to reach new rows. Every new row scores points.
 - **Dodge** cars, trucks and buses. Wait for a gap, then go.
 - **Cross rivers** by hopping onto floating logs and lily pads. Don't fall in!
-- **Watch the tracks.** When the signals flash and you hear the whistle, a train is coming.
-- **Don't dawdle.** Reach a new row every few seconds or the eagle swoops in.
+- **Watch the tracks.** Railway signals are **green** when the track is clear and **flash red** (with a bell and a whistle) a few seconds before a train comes.
+- **Mind the turtles.** Turtle rivers look friendly, but the turtles shake and then dive — hop off in time!
+- **Don't dawdle.** Stand still and you'll hear the **eagle screech**; 3 seconds later it swoops in. Reach a new row to send it away.
 
 You lose if you get hit, fall in the water, or the eagle gets you.
+
+## Difficulty
+
+Pick **Easy, Medium, Hard or Extreme** in Settings. Harder modes mean faster and busier traffic, more frequent trains, faster rivers and a quicker eagle (Easy 12 s, Medium 9 s, Hard 7.5 s, Extreme 6 s). Each difficulty keeps its own top score.
 
 ## Scoring
 
@@ -26,6 +31,10 @@ You lose if you get hit, fall in the water, or the eagle gets you.
 | Mouse | Click = hop forward, drag = hop that way | |
 
 **On-screen D-pad (touch screens):** Up/Down sit on one side and Left/Right on the other — you can swap the sides in Settings. While the D-pad is on, taps and swipes on the screen are turned off so nothing happens by accident.
+
+## What's on the road
+
+Cars, taxis, police cars, vans, trucks and buses — plus **motorbikes, tractors, ambulances, ice-cream trucks and sports cars**, each with their own speed and sounds. On the grass, trees are joined by **hay bales, fences, scarecrows, stumps, barrels, sunflowers and mushrooms** that block your way.
 
 ## Collect
 

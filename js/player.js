@@ -33,6 +33,16 @@ function Player(scene) {
   this.bubble.visible = false;
   this.group.add(this.bubble);
   this.ghostMats = new Map();
+
+  // Soft blob shadow: it shrinks and fades as the chicken leaves the ground.
+  var sg = new THREE.CircleGeometry(0.34, 20);
+  sg.rotateX(-Math.PI / 2);
+  this.shadow = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({
+    color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2
+  }));
+  this.shadow.renderOrder = 1;
+  this.scene.add(this.shadow);
+  this.onLand = null;
   this.reset();
 }
 
@@ -163,7 +173,9 @@ Player.prototype.reset = function () {
   this.ghost = false;
   this.ghostLeft = 0;
   this.setShield(false);
-  this.landSquashT = 1;
+  this.landT = 9;            // seconds since landing (drives the landing spring)
+  this.fid = { type: null, t: 0, dur: 0, next: Utils.randRange(2.5, 5) };
+  this.shadow.visible = true;
   this.phase = 0;
   this.blinkTimer = Utils.randRange(2, 4);
   this.blinkT = -1;
@@ -216,6 +228,9 @@ Player.prototype.tryStartHop = function (dx, dz, world) {
   this.hopTo.z = targetZ;
   this.hopTo.y = world.surfaceY(targetX, targetZ);
   this.onLog = null;
+  this.fid.type = null;
+  var r0 = world.getRow(Math.round(startZ));
+  if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ);
   if (GameAudio) GameAudio.hop();
 };
 
@@ -281,18 +296,24 @@ Player.prototype.update = function (dt, world) {
     var sxz = Utils.lerp(1.04, 0.9, Math.sin(Math.PI * t));
     this.group.scale.set(sxz, sy, sxz);
 
-    this.bodyGroup.rotation.x = Math.sin(Math.PI * t) * -0.16;
-    this.wingL.rotation.z = Math.sin(t * Math.PI) * 0.8;
-    this.wingR.rotation.z = -Math.sin(t * Math.PI) * 0.8;
+    // lean into the hop, a little wobble, wings flapping
+    var arc = Math.sin(Math.PI * t);
+    this.bodyGroup.rotation.x = arc * -0.2;
+    this.bodyGroup.rotation.z = Math.sin(t * Math.PI * 2) * 0.07;
+    this.bodyGroup.rotation.y = 0;
+    var flap = arc * 1.0 + Math.sin(t * 34) * 0.18 * arc;
+    this.wingL.rotation.z = flap;
+    this.wingR.rotation.z = -flap;
 
     if (t >= 1) {
       this.hopping = false;
       this.air = 0;
       this.x = this.hopTo.x;
       this.z = this.hopTo.z;
-      this.landSquashT = 0;
+      this.landT = 0;
       if (this.z > this.maxZ) this.maxZ = this.z;
       this.onLanded(world);
+      if (this.onLand) this.onLand();
       if (this.queuedMove && !this.dying) {
         var qm = this.queuedMove;
         this.queuedMove = null;
@@ -301,27 +322,58 @@ Player.prototype.update = function (dt, world) {
     }
   } else {
     this.bodyGroup.rotation.x = Utils.lerp(this.bodyGroup.rotation.x, 0, 0.25);
-    this.wingL.rotation.z = Utils.lerp(this.wingL.rotation.z, 0, 0.25);
-    this.wingR.rotation.z = Utils.lerp(this.wingR.rotation.z, 0, 0.25);
+    this.bodyGroup.rotation.z = Utils.lerp(this.bodyGroup.rotation.z, 0, 0.25);
 
-    if (this.landSquashT < 1) {
-      this.landSquashT += dt / 0.16;
-      var e = Utils.easeOutQuad(Math.min(1, this.landSquashT));
-      this.group.scale.set(Utils.lerp(1.14, 1, e), Utils.lerp(0.72, 1, e), Utils.lerp(1.14, 1, e));
-    } else {
-      this.group.scale.set(1, 1 + Math.sin(this.phase) * 0.015, 1);
+    // landing spring: squash, overshoot, settle
+    var sprung = false;
+    if (this.landT < 0.7) {
+      this.landT += dt;
+      var damp = Math.exp(-9 * this.landT), osc = Math.cos(18 * this.landT);
+      this.group.scale.set(1 + 0.16 * damp * osc, 1 - 0.28 * damp * osc, 1 + 0.16 * damp * osc);
+      sprung = true;
     }
 
-    // carried along by a log
+    // little idle fidgets so the chicken never stands like a statue
+    var fid = this.fid, fWing = null, fYaw = 0, fAir = 0, fSquash = 0;
+    if (!sprung && !this.bouncing) {
+      if (fid.type) {
+        fid.t += dt;
+        var u = fid.t / fid.dur;
+        if (u >= 1) { fid.type = null; fid.next = Utils.randRange(3, 6.5); }
+        else {
+          var env = Math.sin(Math.PI * u);
+          if (fid.type === 'flutter') fWing = Math.sin(fid.t * 42) * 0.55 * env;
+          else if (fid.type === 'look') fYaw = Math.sin(u * Math.PI * 2) * 0.6;
+          else { fAir = Math.abs(Math.sin(Math.PI * u)) * 0.13; fSquash = Math.sin(Math.PI * u) * 0.1; }
+        }
+      } else {
+        fid.next -= dt;
+        if (fid.next <= 0) {
+          fid.type = Utils.weightedChoice([{ value: 'flutter', weight: 0.35 }, { value: 'look', weight: 0.4 }, { value: 'bounce', weight: 0.25 }]);
+          fid.t = 0;
+          fid.dur = fid.type === 'flutter' ? 0.7 : fid.type === 'look' ? 1.3 : 0.42;
+        }
+      }
+    }
+    if (fWing !== null) { this.wingL.rotation.z = fWing; this.wingR.rotation.z = -fWing; }
+    else {
+      this.wingL.rotation.z = Utils.lerp(this.wingL.rotation.z, 0, 0.25);
+      this.wingR.rotation.z = Utils.lerp(this.wingR.rotation.z, 0, 0.25);
+    }
+    this.bodyGroup.rotation.y = Utils.lerp(this.bodyGroup.rotation.y, fYaw, 0.3);
+    if (!sprung) this.group.scale.set(1 - fSquash * 0.4, 1 + Math.sin(this.phase) * 0.015 + fSquash, 1 - fSquash * 0.4);
+    this.air = fAir;
+
+    // carried along by a log (or a turtle)
     if (this.onLog) {
       var l = this.onLog;
       this.x += l.direction * l.speed * dt;
-      this.y = l.top + l.bob - l.dip;
-      if (Math.abs(this.x) > CONFIG.PLAY_HALF + 0.9) {
-        this.startDeath('drown', world);
+      this.y = (l.curTop !== undefined ? l.curTop : l.top + l.bob - l.dip) + fAir;
+      if (Math.abs(this.x) > CONFIG.PLAY_HALF + 0.9 || l.submerged) {
+        this.startDeath('drown', world); // carried off the edge, or the turtle dived
       }
     } else {
-      this.y = world.surfaceY(this.x, this.z);
+      this.y = world.surfaceY(this.x, this.z) + fAir;
     }
   }
 
@@ -340,6 +392,12 @@ Player.prototype.update = function (dt, world) {
   this.group.position.set(this.x + offsetX, this.y, this.z + offsetZ);
   this.group.rotation.y = Utils.lerpAngle(this.group.rotation.y, this.facing, 0.45);
 
+  // blob shadow on whatever is underneath, smaller and fainter the higher we are
+  var lift = Utils.clamp(this.air / 0.6, 0, 1);
+  this.shadow.position.set(this.x + offsetX, this.y - this.air + 0.014, this.z + offsetZ);
+  this.shadow.scale.setScalar(CONFIG.CHICKEN_SCALE * (1.15 - lift * 0.5));
+  this.shadow.material.opacity = 0.3 * (1 - lift * 0.65);
+
   if (!this.dying) this.checkHazards(world);
 };
 
@@ -352,6 +410,7 @@ Player.prototype.onLanded = function (world) {
       this.onLog = log;
       log.dip = 0.11;
       if (log.pad) Particles.puff(this.x, log.top, this.z);
+      Particles.ring(this.x, (log.curTop !== undefined ? log.curTop : log.top) + 0.01, this.z, 0xdff6ff, 1.2);
     } else {
       this.startDeath('drown', world);
       return;
@@ -398,6 +457,7 @@ Player.prototype.checkHazards = function (world) {
 Player.prototype.startDeath = function (type, world, hitBy) {
   if (this.dying || !this.alive || this.invincible) return;
   this.dying = true;
+  this.shadow.visible = false;
   this.deathType = type;
   this.deathTimer = 0;
   this.hopping = false;
