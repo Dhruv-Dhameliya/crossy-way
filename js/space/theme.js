@@ -6,7 +6,7 @@
   // ---- neon palette ----
   var colors = {
     sky: 0x120f2e,
-    grassA: 0x231f52, grassB: 0x1d1a47, grassSide: 0x0b0922, neonA: 0x00e5ff, neonB: 0xff2bd6,
+    grassA: 0x231f52, grassB: 0x1d1a47, grassSide: 0x0b0922, neonA: 0x19c8e0, neonB: 0x9a5be0,
     roadA: 0x0f4a60, roadB: 0x0c4058, roadSide: 0x04141f, roadLine: 0x00e5ff,
     waterA: 0x070a26, waterB: 0x050820, waterSide: 0x02030f, waterAccent: 0x8ff4ff,
     railBedA: 0x2e1a2a, railBedB: 0x28142a, railSide: 0x120810, sleeper: 0xff7a00, rail: 0xaef6ff,
@@ -46,9 +46,9 @@
 
   // the neon pulses gently: lane lines and props breathe in and out
   function update(dt, time) {
-    SpaceModels.setPulse(0.9 + 0.2 * (0.5 + 0.5 * Math.sin(time * 2.2)));
+    SpaceModels.setPulse(0.95 + 0.1 * (0.5 + 0.5 * Math.sin(time * 2.2)));
     var mats = Textures.glowMaterials;
-    for (var i = 0; i < mats.length; i++) mats[i].emissiveIntensity = 0.78 + 0.32 * (0.5 + 0.5 * Math.sin(time * 1.8 + i * 0.9));
+    for (var i = 0; i < mats.length; i++) mats[i].emissiveIntensity = 0.55 + 0.18 * (0.5 + 0.5 * Math.sin(time * 1.8 + i * 0.9));
   }
 
   // share card: a neon night sky
@@ -96,7 +96,7 @@
     },
     attack: SpaceAttack,          // a UFO instead of the eagle
     suit: suit,
-    shadowGlow: { color: 0x00e5ff, opacity: 0.55 },
+    shadowGlow: { color: 0x19c8e0, opacity: 0.38 },
     puffColors: [0x00e5ff, 0xff2bd6, 0xffffff],
     fallColors: [0xa24dff, 0x00e5ff, 0xffffff],
     card: card,

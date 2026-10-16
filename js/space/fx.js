@@ -33,7 +33,7 @@ var SpaceFx = (function () {
     var dg = new THREE.BufferGeometry();
     dg.setAttribute('position', new THREE.BufferAttribute(dustPos, 3).setUsage(THREE.DynamicDrawUsage));
     dg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    dust = new THREE.Points(dg, new THREE.PointsMaterial({ vertexColors: true, size: 2.6, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+    dust = new THREE.Points(dg, new THREE.PointsMaterial({ vertexColors: true, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
     dust.frustumCulled = false;
     dust.visible = false;
     scene.add(dust);
@@ -45,7 +45,7 @@ var SpaceFx = (function () {
     var showDust = mix > 0.02;
     dust.visible = showDust;
     if (showDust) {
-      dust.material.opacity = (0.65 + 0.3 * Math.sin(time * 2.3)) * mix;
+      dust.material.opacity = (0.4 + 0.15 * Math.sin(time * 2.3)) * mix;
       var nd = level === 'high' ? DUST_MAX : level === 'medium' ? 110 : 60;
       for (var d = 0; d < nd; d++) {
         var o = d * 3;
@@ -62,7 +62,7 @@ var SpaceFx = (function () {
     sets.forEach(function (set) {
       set.lines.visible = on;
       if (!on) return;
-      set.lines.material.opacity = Math.min(0.95, 0.45 + meteorAmt * 0.6);
+      set.lines.material.opacity = Math.min(0.8, 0.3 + meteorAmt * 0.5);
       var count = Math.max(2, Math.round(METEOR_MAX * meteorAmt * (level === 'low' ? 0.5 : 1)));
       var p = set.pos;
       for (var i = 0; i < METEOR_MAX; i++) {

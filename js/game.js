@@ -45,7 +45,7 @@
   var IS_TOUCH = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
   var el = {};
-  ['score', 'coins', 'bestScore', 'powerups', 'toast', 'flash', 'freezeFx', 'startPanel', 'modeBtn', 'infoBtn', 'infoPanel', 'closeInfoBtn', 'diffNote', 'bestMode', 'goMode', 'goBest', 'goTitle', 'homeBtn',
+  ['score', 'coins', 'bestScore', 'powerups', 'toast', 'flash', 'freezeFx', 'startPanel', 'modeBtn', 'infoBtn', 'infoPanel', 'closeInfoBtn', 'diffNote', 'bestMode', 'goMode', 'goBest', 'goCoins', 'goCombo', 'goNear', 'goTitle', 'homeBtn',
     'playBtn', 'gameOverPanel', 'finalScore', 'confetti',
     'restartBtn', 'shareBtn', 'fullscreenBtn', 'settingsBtn', 'pauseBtn', 'settingsPanel', 'closeSettingsBtn', 'dpad',
     'startHint', 'combo', 'comboMult', 'comboCount', 'comboBar', 'pops', 'wxBadge', 'heroChick',
@@ -1249,6 +1249,9 @@
     }
     var record = isBest && score > 0;
     refreshBests();
+    el.goCoins.textContent = runStats.coins;
+    el.goCombo.textContent = 'x' + runStats.maxMult;
+    el.goNear.textContent = runStats.near;
     el.goTitle.textContent = record ? '🏆 NEW TOP SCORE!' : 'GAME OVER';
     el.gameOverPanel.classList.toggle('is-record', record);
     refreshHud();

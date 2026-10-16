@@ -617,7 +617,7 @@ var SpaceModels = (function () {
           '#include <emissivemap_fragment>\n' +
           'float nLum = max(vColor.r, max(vColor.g, vColor.b));\n' +
           'float nSat = nLum - min(vColor.r, min(vColor.g, vColor.b));\n' +
-          'totalEmissiveRadiance += vColor * (smoothstep(0.42, 0.8, nLum) * smoothstep(0.22, 0.5, nSat) * 1.05 + 0.06) * uNeon;');
+          'totalEmissiveRadiance += vColor * (smoothstep(0.42, 0.8, nLum) * smoothstep(0.22, 0.5, nSat) * 0.7 + 0.03) * uNeon;');
       };
       _neonMat.customProgramCacheKey = function () { return 'neon2'; };
       _neonMat.__shared = true;
@@ -652,7 +652,7 @@ var SpaceModels = (function () {
       _trailGeo.__shared = true;
     }
     if (!_trailMats[color]) {
-      var m = new THREE.MeshBasicMaterial({ map: glowTexture(), color: color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide, opacity: 0.85 });
+      var m = new THREE.MeshBasicMaterial({ map: glowTexture(), color: color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide, opacity: 0.5 });
       m.__shared = true;
       _trailMats[color] = m;
     }
@@ -673,7 +673,7 @@ var SpaceModels = (function () {
     tall.renderOrder = 2;
     var pool = new THREE.Mesh(_trailGeo, mat);
     pool.rotation.x = -Math.PI / 2;
-    pool.scale.set(len * 1.1 + 0.6, 0.8, 1);
+    pool.scale.set(len * 0.9 + 0.5, 0.6, 1);
     pool.position.set(-0.1, -0.06, 0);       // (the ship hovers ~0.1 above the lane, so this lies on it)
     pool.renderOrder = 1;
     mesh.add(flat); mesh.add(tall); mesh.add(pool);
@@ -695,7 +695,7 @@ var SpaceModels = (function () {
       m.position.x = s * (CONFIG.PLAY_HALF + 1.6);
       g.add(m);
       var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, 7, 10, 1, true), new THREE.MeshBasicMaterial({
-        color: s > 0 ? PINK : CYAN, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide
+        color: s > 0 ? PINK : CYAN, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide
       }));
       beam.position.set(m.position.x, 3.5, 0);
       beam.renderOrder = 3;

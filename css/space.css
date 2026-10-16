@@ -1,51 +1,88 @@
 /* Space biome page styling. Everything here only applies while the chicken is in
-   space (game.js sets <body data-biome="space">), so the Forest looks exactly as before. */
+   space (game.js sets <body data-biome="space">), so the Forest looks exactly as before.
+   Calm neon: dark glass panels with thin cyan / violet edges and soft glows. */
 
-/* a neon vignette with faint scan lines over the whole game */
+/* a soft vignette with very faint scan lines over the game */
 body[data-biome="space"] #gameContainer::after {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
   background:
-    radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 52%, rgba(255, 43, 214, 0.20) 100%),
-    radial-gradient(ellipse at 0% 100%, rgba(0, 229, 255, 0.16), rgba(0, 0, 0, 0) 45%),
-    radial-gradient(ellipse at 100% 0%, rgba(162, 77, 255, 0.18), rgba(0, 0, 0, 0) 45%),
-    repeating-linear-gradient(0deg, rgba(0, 229, 255, 0.04) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
+    radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 58%, rgba(120, 60, 220, 0.14) 100%),
+    repeating-linear-gradient(0deg, rgba(0, 229, 255, 0.022) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
   mix-blend-mode: screen;
-  animation: space-pulse 5s ease-in-out infinite alternate;
 }
-@keyframes space-pulse { from { opacity: 0.75; } to { opacity: 1; } }
 
-/* neon HUD */
+/* ---- in-run HUD ---- */
 body[data-biome="space"] #score {
   color: #ffffff;
-  text-shadow: 0 0 10px #00e5ff, 0 0 24px #00e5ff, 0 0 40px #ff2bd6;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.7), 0 0 22px rgba(120, 60, 220, 0.5);
 }
 body[data-biome="space"] .best-box {
-  background: rgba(10, 6, 40, 0.65);
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.6), inset 0 0 8px rgba(0, 229, 255, 0.25);
-  border: 1px solid rgba(0, 229, 255, 0.7);
+  background: rgba(10, 6, 40, 0.6);
+  border: 1px solid rgba(0, 229, 255, 0.45);
 }
-body[data-biome="space"] .best-box .best-mode { background: rgba(255, 43, 214, 0.3); }
+body[data-biome="space"] .best-box .best-mode { background: rgba(162, 77, 255, 0.35); }
 body[data-biome="space"] .coin-box {
   background: linear-gradient(rgba(20, 8, 70, 0.9), rgba(8, 4, 40, 0.9));
-  border-color: #00e5ff;
-  box-shadow: 0 0 14px rgba(0, 229, 255, 0.7), inset 0 0 10px rgba(255, 43, 214, 0.35);
+  border-color: rgba(0, 229, 255, 0.7);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.4), 0 4px 0 rgba(0, 0, 0, 0.25);
 }
-body[data-biome="space"] .corner-buttons button,
-body[data-biome="space"] #pauseBtn {
-  box-shadow: 0 0 14px rgba(162, 77, 255, 0.9), 0 3px 0 rgba(0, 0, 0, 0.3);
+body[data-biome="space"] #pauseBtn { box-shadow: 0 0 10px rgba(162, 77, 255, 0.6), 0 3px 0 rgba(0, 0, 0, 0.3); }
+body[data-biome="space"] #wxBadge { filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.7)); }
+
+/* ---- home screen: a dark glass spotlight behind the menu, so the busy crystals
+        behind the title fade into the background ---- */
+body[data-biome="space"] #startPanel { isolation: isolate; }
+/* the world behind the menu is softly blurred and dimmed so the title stands out */
+body[data-biome="space"] #startPanel::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  backdrop-filter: blur(3px) saturate(0.75) brightness(0.8);
+  -webkit-backdrop-filter: blur(3px) saturate(0.75) brightness(0.8);
+  -webkit-mask-image: radial-gradient(ellipse 40% 62% at 50% 42%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse 40% 62% at 50% 42%, #000 45%, transparent 100%);
 }
-body[data-biome="space"] .combo {
-  box-shadow: 0 0 16px rgba(255, 43, 214, 0.8), 0 4px 0 rgba(0, 0, 0, 0.25);
+body[data-biome="space"] #startPanel {
+  background:
+    radial-gradient(ellipse 62% 78% at 50% 42%, rgba(6, 3, 26, 0.88) 0%, rgba(6, 3, 26, 0.68) 52%, rgba(6, 3, 26, 0) 100%),
+    linear-gradient(to bottom, rgba(6, 3, 26, 0.35), rgba(6, 3, 26, 0) 40%, rgba(6, 3, 26, 0.4));
 }
-body[data-biome="space"] #toast > *, body[data-biome="space"] .toast {
-  box-shadow: 0 0 22px rgba(0, 229, 255, 0.85), 0 0 8px rgba(255, 43, 214, 0.7);
+body[data-biome="space"] .logo { filter: drop-shadow(0 0 14px rgba(0, 229, 255, 0.35)) drop-shadow(0 0 30px rgba(162, 77, 255, 0.35)); }
+body[data-biome="space"] .ribbon { filter: drop-shadow(0 0 8px rgba(255, 43, 214, 0.4)); }
+body[data-biome="space"] .hero-chick { filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.55)) drop-shadow(0 6px 0 rgba(0, 0, 0, 0.25)); }
+body[data-biome="space"] .play-btn { box-shadow: 0 6px 0 var(--green-d), 0 0 22px rgba(57, 255, 136, 0.35); }
+body[data-biome="space"] .panel .hint { color: #c9c2ff; text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); }
+
+/* ---- game over: a dark glass card ---- */
+body[data-biome="space"] #gameOverPanel {
+  background: radial-gradient(circle at 50% 45%, rgba(60, 30, 140, 0.35), rgba(4, 2, 18, 0.88));
 }
 body[data-biome="space"] .go-card {
-  border-color: #00e5ff;
-  box-shadow: 0 0 26px rgba(0, 229, 255, 0.7), 0 0 60px rgba(255, 43, 214, 0.35), 0 8px 0 rgba(0, 0, 0, 0.25);
+  background: linear-gradient(#181048, #0a0730);
+  color: #e8eeff;
+  border: 2px solid rgba(0, 229, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(162, 77, 255, 0.5), 0 0 28px rgba(0, 229, 255, 0.25), inset 0 0 34px rgba(120, 60, 255, 0.22), 0 16px 40px rgba(0, 0, 0, 0.5);
 }
-body[data-biome="space"] #wxBadge { filter: drop-shadow(0 0 6px #00e5ff); }
+body[data-biome="space"] .go-ribbon {
+  background: linear-gradient(#ff3fae, #a21fd6);
+  border: 2px solid #ffd6f4;
+  box-shadow: 0 0 16px rgba(255, 43, 214, 0.55), 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+body[data-biome="space"] #gameOverPanel.is-record .go-ribbon { background: linear-gradient(#ffd93d, #ff9f1c); color: #3b2300; text-shadow: none; border-color: #fff3b0; box-shadow: 0 0 18px rgba(255, 200, 60, 0.6), 0 4px 0 rgba(0, 0, 0, 0.35); }
+body[data-biome="space"] .go-score small { color: #a99cff; }
+body[data-biome="space"] .go-score b {
+  color: #ffffff; -webkit-text-stroke: 0; paint-order: normal;
+  text-shadow: 0 0 14px rgba(0, 229, 255, 0.6), 0 0 34px rgba(162, 77, 255, 0.55);
+}
+body[data-biome="space"] .go-mode { color: #a99cff; }
+body[data-biome="space"] .go-score .go-mode b { color: #ffffff; font-size: inherit; text-shadow: none; margin: 0; }
+body[data-biome="space"] .go-cause { color: #a99cff; }
+body[data-biome="space"] .stat {
+  background: rgba(255, 255, 255, 0.07); color: #e8eeff;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+}
+body[data-biome="space"] .stat.s-coin, body[data-biome="space"] .stat.s-top, body[data-biome="space"] .stat.s-near { background: rgba(255, 255, 255, 0.07); }
+body[data-biome="space"] .stat small { opacity: 0.75; }
+body[data-biome="space"] .go-card button { border-color: rgba(10, 6, 40, 0.9); }
 
-@media (prefers-reduced-motion: reduce) {
-  body[data-biome="space"] #gameContainer::after { animation: none; }
-}
+/* ---- menus opened in space stay light but get a soft edge ---- */
+body[data-biome="space"] .set-card { box-shadow: 0 0 22px rgba(0, 229, 255, 0.25), 0 10px 0 rgba(0, 0, 0, 0.3), 0 22px 44px rgba(0, 0, 0, 0.45); }
+body[data-biome="space"] #toast > *, body[data-biome="space"] .toast { box-shadow: 0 0 14px rgba(0, 229, 255, 0.5); }

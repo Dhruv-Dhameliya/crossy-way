@@ -29,15 +29,13 @@ var SpaceTextures = (function () {
       kit.speckle(ctx, w, h, base, 20, 11 + (base & 255), 0.12);
       var col = kit.hexCss(accent);
       ctx.fillStyle = col; g.fillStyle = col;
-      ctx.globalAlpha = 0.55; g.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.4; g.globalAlpha = 0.5;
       ctx.fillRect(0, 0, 2, h); g.fillRect(0, 0, 2, h);              // tile borders
-      ctx.fillRect(0, 0, w, 3); g.fillRect(0, 0, w, 3);
-      ctx.globalAlpha = 0.25; g.globalAlpha = 0.35;
-      ctx.fillRect(w / 2 - 1, 0, 2, h); g.fillRect(w / 2 - 1, 0, 2, h);
-      ctx.globalAlpha = 1; g.globalAlpha = 1;
-      ctx.fillRect(0, 0, 7, 7); g.fillRect(0, 0, 7, 7);               // corner node
-      ctx.fillStyle = 'rgba(255,255,255,0.9)'; g.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.fillRect(2, 2, 3, 3); g.fillRect(2, 2, 3, 3);
+      ctx.fillRect(0, 0, w, 2); g.fillRect(0, 0, w, 2);
+      ctx.globalAlpha = 1; g.globalAlpha = 0.8;
+      ctx.fillRect(0, 0, 5, 5); g.fillRect(0, 0, 5, 5);               // corner node
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; g.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillRect(1, 1, 2, 2); g.fillRect(1, 1, 2, 2);
     }, true);
   }
 
@@ -51,12 +49,14 @@ var SpaceTextures = (function () {
       ctx.fillRect(0, 0, w, h);
       stars(ctx, w, h, 19 + (base & 255), 14, 0.35, g);
       var col = kit.hexCss(line);
-      ctx.fillStyle = 'rgba(120,240,255,0.16)'; g.fillStyle = 'rgba(0,229,255,0.28)';
+      ctx.fillStyle = 'rgba(120,240,255,0.10)'; g.fillStyle = 'rgba(0,229,255,0.12)';
       for (var x = 0; x < w; x += 32) { ctx.fillRect(x, 0, 2, h); g.fillRect(x, 0, 2, h); }
       ctx.fillRect(0, 62, w, 2); g.fillRect(0, 62, w, 2);
       ctx.fillStyle = col; g.fillStyle = col;                        // neon rails along both edges
-      ctx.fillRect(0, 0, w, 7); g.fillRect(0, 0, w, 7);
-      ctx.fillRect(0, h - 7, w, 7); g.fillRect(0, h - 7, w, 7);
+      ctx.globalAlpha = 0.75; g.globalAlpha = 0.7;
+      ctx.fillRect(0, 0, w, 5); g.fillRect(0, 0, w, 5);
+      ctx.fillRect(0, h - 5, w, 5); g.fillRect(0, h - 5, w, 5);
+      ctx.globalAlpha = 1; g.globalAlpha = 1;
       ctx.fillStyle = '#ffffff'; g.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, 2); g.fillRect(0, 0, w, 2);
       ctx.fillRect(0, h - 2, w, 2); g.fillRect(0, h - 2, w, 2);

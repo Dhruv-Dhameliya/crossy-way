@@ -445,6 +445,12 @@ html[data-title-font="pixel"] .go-score b { font-size: 44px; }
 .stat i { font-style: normal; }
 .stat.s-top { background: #fff1b8; }
 .stat.s-coin { background: #d9f3ff; }
+.stat.s-near { background: #ffe3e3; }
+.go-stats { gap: 8px; }
+.go-stats .stat { padding: 6px 8px; column-gap: 6px; min-width: 0; }
+.go-stats .stat span { font-size: 22px; }
+.go-stats .stat b { font-size: 18px; }
+.go-stats .stat small { font-size: 9px; letter-spacing: 0.1em; }
 html[data-title-font="pixel"] .stat b { font-size: 14px; }
 
 .go-actions { display: flex; gap: 10px; width: 100%; margin-top: 4px; }
@@ -917,7 +923,7 @@ html[data-title-font="pixel"] .go-row #restartBtn { font-size: 11px; }
 .share-actions .share-act:active { transform: translateY(4px); box-shadow: 0 1px 0 #23782c; }
 .close-btn.back { background: linear-gradient(#ff6b6f, #e0393f); }
 .go-mode { margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.15em; color: #7d9a6c; }
-.go-mode b { font-family: inherit; font-size: inherit; color: var(--ink); -webkit-text-stroke: 0; text-shadow: none; margin: 0; }
+html .go-score .go-mode b { font-family: inherit; font-size: inherit; font-weight: 700; color: var(--ink); -webkit-text-stroke: 0; text-shadow: none; margin: 0; }
 
 /* narrow phones: keep the home content clear of the score / TOP chip in the top-left corner */
 @media (max-width: 480px) { #startPanel { padding-top: calc(84px + var(--safe-t)); } }
