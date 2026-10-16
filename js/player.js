@@ -6,7 +6,6 @@ function Player(scene) {
   this.group = new THREE.Group();
   this.themeName = 'forest';
   this.themeSuit = null;
-  this.shadowBase = 0.3;
   this.buildModel();
   this.scene.add(this.group);
 
@@ -36,6 +35,8 @@ function Player(scene) {
   this.suit = false;
   // A biome theme can replace the eagle with its own attacker (theme.attack).
   this.attackTheme = null;
+  this.fxT = 0;
+  this.fxSeq = 0;
 
   this.deathVelocity = new THREE.Vector3();
   this.onCoin = null;
@@ -107,8 +108,8 @@ Player.prototype.setGhost = function (on) {
   if (!on) this.ghostMats.forEach(function (m) { m.opacity = 0.4; });
 };
 
-// The theme of the biome the chicken stands in: it may add a suit (e.g. a helmet)
-// and restyle the blob shadow (e.g. a neon glow). The Forest adds nothing.
+// The theme of the biome the chicken stands in: it may add a suit (e.g. a helmet).
+// The Forest adds nothing.
 Player.prototype.setTheme = function (name) {
   this.themeName = name;
   this.refreshTheme();
@@ -122,12 +123,8 @@ Player.prototype.refreshTheme = function () {
     this.themeSuit = T.suit();
     this.themeSuit.traverse(function (o) { if (o.isMesh) o.castShadow = false; });
     this.bodyGroup.add(this.themeSuit);
+    if (this.ghost) { this.setGhost(false); this.setGhost(true); }   // the new suit turns see-through too
   }
-  var glow = T.shadowGlow;
-  this.shadow.material.color.setHex(glow ? glow.color : 0x000000);
-  this.shadow.material.blending = glow ? THREE.AdditiveBlending : THREE.NormalBlending;
-  this.shadow.material.needsUpdate = true;
-  this.shadowBase = glow ? glow.opacity : 0.3;
 };
 
 // The theme of the lane at row z.
@@ -295,9 +292,9 @@ Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
   var farX = targetX + dx, farZ = targetZ + dz;
   var farOk = !world.isBlocked(farX, farZ) && farZ >= minZ;
   var leap = null;
-  if (isSlide) { /* gliding on ice: the caller already checked the tile */ }
-  else if (this.jumpLevel >= 2 && farOk) leap = 'double';
-  else if (world.isBlocked(targetX, targetZ)) {
+  // (a glide on ice is a plain step: the caller already checked the tile)
+  if (!isSlide && this.jumpLevel >= 2 && farOk) leap = 'double';
+  else if (!isSlide && world.isBlocked(targetX, targetZ)) {
     if (this.jumpLevel >= 1 && world.isSmallObstacle(targetX, targetZ) && farOk) leap = 'over';
     else { this.bounce(dx, dz); return; }
   } else if (targetZ < minZ) {
@@ -325,6 +322,7 @@ Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
   this.hopTo.y = world.surfaceY(targetX, targetZ);
   this.onLog = null;
   this.fid.type = null;
+  this.fxBurst(startX, this.y, startZ, 6);
   var r0 = world.getRow(Math.round(startZ));
   if (isSlide) {
     Particles.burst(startX, 0.06, startZ, { colors: [0xffffff, 0xcdeffa, 0x9fe9ff], count: 3, speed: 1.2, up: 0.9, size: 0.08, life: 0.35, gravity: 2, spread: 0.25, floor: 0 });
@@ -332,6 +330,16 @@ Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
   } else {
     if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ, Biome.theme(r0.biome).puffColors);
     if (GameAudio) { if (leap) GameAudio.jump(leap); else GameAudio.hop(); }
+  }
+};
+
+// The hop effect from the shop (sparkles, hearts, rainbow...). n particles at a spot.
+Player.prototype.fxBurst = function (x, y, z, n) {
+  var fx = Cosmetics.fx();
+  if (!fx) return;
+  for (var i = 0; i < n; i++) {
+    var col = fx.seq ? fx.colors[this.fxSeq++ % fx.colors.length] : fx.colors[Math.floor(Math.random() * fx.colors.length)];
+    Particles.burst(x, y + 0.25, z, { colors: [col], count: 1, speed: 1.1, up: fx.up * 1.6, size: fx.size, life: fx.life, gravity: fx.gravity * 2, spread: 0.3, floor: y - 0.1 });
   }
 };
 
@@ -400,6 +408,8 @@ Player.prototype.update = function (dt, world) {
     this.x = Utils.lerp(this.hopFrom.x, this.hopTo.x, t);
     this.z = Utils.lerp(this.hopFrom.z, this.hopTo.z, t);
     this.air = Utils.hopArc(t) * this.hopH;
+    this.fxT -= dt;
+    if (this.fxT <= 0) { this.fxT = 0.045; this.fxBurst(this.x, this.y - this.air, this.z, 1); }   // a trail while in the air
     this.y = Utils.lerp(this.hopFrom.y, this.hopTo.y, t) + this.air;
 
     // squash & stretch: crouch -> stretch in the air -> crouch on landing
@@ -426,8 +436,9 @@ Player.prototype.update = function (dt, world) {
       this.x = this.hopTo.x;
       this.z = this.hopTo.z;
       this.landT = 0;
-      if (this.z > this.maxZ) this.maxZ = this.z;
+      this.fxBurst(this.x, this.y, this.z, 5);
       this.onLanded(world);
+      if (!this.dying && this.z > this.maxZ) this.maxZ = this.z;   // a row only counts if you survived the landing
       if (this.onLand) this.onLand();
       var gliding = !this.dying && this.glide(world);
       if (!gliding && this.queuedMove && !this.dying) {
@@ -512,7 +523,7 @@ Player.prototype.update = function (dt, world) {
   var lift = Utils.clamp(this.air / 0.6, 0, 1);
   this.shadow.position.set(this.x + offsetX, this.y - this.air + 0.014, this.z + offsetZ);
   this.shadow.scale.setScalar(CONFIG.CHICKEN_SCALE * (1.15 - lift * 0.5));
-  this.shadow.material.opacity = (this.shadowBase || 0.3) * (1 - lift * 0.65);
+  this.shadow.material.opacity = 0.3 * (1 - lift * 0.65);
 
   var jr = this.jumpRing;
   jr.visible = this.jumpLevel > 0;
@@ -589,6 +600,7 @@ Player.prototype.startDeath = function (type, world, hitBy) {
   this.hopping = false;
   this.queuedMove = null;
   this.bouncing = false;
+  this.y -= this.air;               // settle on the ground first (a death can land mid-hop)
   this.air = 0;
   this.onLog = null;
   this.bodyGroup.rotation.set(0, 0, 0);

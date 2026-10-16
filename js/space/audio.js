@@ -3,6 +3,12 @@
 var SpaceAudio = (function () {
   var tone = GameAudio.kit.tone, noise = GameAudio.kit.noise;
   return {
+      // a solar flare: a rising whoosh and a bright shimmer (the space version of a thunder strike)
+      flare: function () {
+        noise(1.4, 0.25, { filter: 'bandpass', freq: 400, freqEnd: 4000, q: 0.5, attack: 0.15 });
+        tone(220, 1.2, 'sawtooth', 0.05, { freqEnd: 880, attack: 0.2 });
+        tone(1760, 0.8, 'sine', 0.03, { delay: 0.3, freqEnd: 2200 });
+      },
       cometAlarm: function (vol, short) {
         var n = short ? 2 : 4;
         for (var i = 0; i < n; i++) {

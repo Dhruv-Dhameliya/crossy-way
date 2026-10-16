@@ -10,6 +10,9 @@ A fast, colourful hopping game. Guide a little chicken across endless roads, riv
 - **Watch the tracks.** Railway signals are **green** when the track is clear and **flash red** (with a bell and a whistle) a few seconds before a train comes.
 - **Mind the turtles.** Turtle rivers look friendly, but the turtles shake and then dive — hop off in time!
 - **Beware crocodile logs.** You can ride a crocodile's back, but when its mouth starts to open the head is about to snap shut — keep away from the front!
+- **Bike lanes.** Some roads are full of fast little bicycles (hover scooters in Space) that ring their bells as they come.
+- **Double railways.** Two tracks next to each other can warn and fire together, with trains coming from opposite directions.
+- **Rotten logs.** Dark, cracked logs shake when you stand on them, then break up and sink for a few seconds.
 - **Slippery ice.** Hop onto an ice lane and you keep gliding a little (up to 3 tiles sideways, one lane forward or back). Plan your next hop.
 - **Chasms.** Some lanes are a bottomless drop with nothing but moving platforms to cross them. Time your hop — miss and you fall.
 - **Don't dawdle.** Stand still and you'll hear the **eagle screech**; 3 seconds later it swoops in. Reach a new row to send it away.
@@ -18,7 +21,7 @@ You lose if you get hit, fall in the water or a chasm, get eaten by a crocodile 
 
 ## Difficulty
 
-Pick **Easy, Medium, Hard or Extreme** in Settings. Harder modes mean faster and busier traffic, more frequent trains, faster rivers and a quicker eagle (Easy 12 s, Medium 9 s, Hard 7.5 s, Extreme 6 s). **Each difficulty keeps its own top score** — you'll see them listed on the difficulty buttons, and the 🏆 chip on screen and the game-over card show the top score for the mode you're playing.
+Pick **Zen, Easy, Medium, Hard or Extreme** in Settings (or on the home screen's difficulty button). **Zen** is the relaxed mode: **no eagle and no timer**, slow calm traffic and lots of extra coins — great for new players or for just collecting coins. Harder modes mean faster and busier traffic, more frequent trains, faster rivers and a quicker eagle (Easy 12 s, Medium 9 s, Hard 7.5 s, Extreme 6 s). **Each difficulty keeps its own top score** — you'll see them listed on the difficulty buttons, and the 🏆 chip on screen and the game-over card show the top score for the mode you're playing.
 
 ## Scoring
 
@@ -37,7 +40,7 @@ Pick **Easy, Medium, Hard or Extreme** in Settings. Harder modes mean faster and
 
 ## What's on the road
 
-Cars, taxis, police cars, vans, trucks and buses — plus **motorbikes, tractors, ambulances, ice-cream trucks and sports cars**, each with their own speed and sounds. On the grass, trees are joined by **hay bales, fences, scarecrows, stumps, barrels, sunflowers and mushrooms** that block your way.
+Cars, taxis, police cars, vans, trucks and buses — plus **motorbikes, tractors, ambulances, ice-cream trucks and sports cars**, each with their own speed and sounds. On the grass, trees are joined by **hay bales, fences, scarecrows, stumps, barrels, sunflowers, mushrooms, wells, tents, log piles, pumpkins and ponds** that block your way (Space has its own: fuel tanks, beacons, wrecks, rovers and crater pools).
 
 ## Collect
 
@@ -55,9 +58,19 @@ Cars, taxis, police cars, vans, trucks and buses — plus **motorbikes, tractors
 | 🦘 | Jump | Hop over small obstacles — stumps, mushrooms, bushes, rocks, hay bales, fences, barrels |
 | ⏭️ | Skip Lane | Leap **over a whole lane** — two tiles at once, over anything: traffic, a river, a train track. Risky: you must land safely! |
 
+## Rare events ⚡
+
+Every so often something special happens: a **thunderstorm** (or a **solar flare** in Space) lights up the whole field in a few flashes, a **coin rain** showers coins on the rows ahead, or a **stampede** — a lane of bison (or alien beasts) thunders across the road in a cloud of dust. You'll hear a rumble and see a toast just before a stampede.
+
+## Trophies 🏆
+
+34 long-term **achievements** sit next to the missions — reach far in a run, hop thousands of times, cross crocodile rivers and chasms, grab every power-up, reach Space and come back, survive Hard and Extreme, lose in every possible way… Each one pays out coins, you get a toast the moment it unlocks, and the game-over card lists the trophies you just earned. Open **Trophies** on the home screen to see your progress (a red dot shows when there's something new).
+
 ## Shop 🛍️
 
-Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, Lime, Fire, Midnight, Golden) and dress it up with **outfits** — shades, a mustache, a bow tie, party hat, red cap, cowboy hat, wizard hat or a royal crown. Mix and match: one hat plus one face item at a time.
+
+
+Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, Lime, Fire, Midnight, Golden) and dress it up with **outfits** — shades, a mustache, a bow tie, party hat, red cap, cowboy hat, wizard hat or a royal crown. Plus new hats (chef, top hat, pirate, viking, propeller cap, halo, flower crown), face items (monocle, scarf) and **Hop Effects** — sparkles, hearts, a rainbow, petals, snowfall, embers and bubbles that follow every hop. Mix and match: one hat, one face item and one effect at a time. Feeling lucky? The **Mystery Chest** costs 90 🪙 and gives you a random item you don't own yet (cheaper items are more likely, rare ones are a treat).
 
 ## Missions 🎯
 
@@ -66,7 +79,7 @@ Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, 
 
 ## Biomes 🚀
 
-The world has more than one look. Run far enough in the **Forest** and a portal carries you into **Space** — a neon, futuristic version of the same game. Everything is replaced by something that belongs in space, with the same rules:
+The world has more than one look. Run far enough in the **Forest** and a portal carries you into **Space** — a dark, sci-fi version of the same game. Everything is replaced by something that belongs in space, with the same rules:
 
 | Forest | Space |
 | --- | --- |
@@ -76,10 +89,10 @@ The world has more than one look. Run far enough in the **Forest** and a portal 
 | Railway and trains (with a signal) | A **comet** streaking across a scorched lane — beacons flash and an alarm sounds first |
 | Crocodile logs | **Orbital laser strikes**: a marked patch on the asteroid charges up, then gets blasted |
 | Chasm and moving platforms | **Black hole** crossed on wrecked hull plates |
-| Trees, hay bales, scarecrows, mushrooms… | **Rockets, neon crystals, monoliths, stranded astronauts, habitat domes, little aliens**… |
+| Trees, hay bales, scarecrows, mushrooms… | **Rockets, crystals, monoliths, stranded astronauts, habitat domes, little aliens**… |
 | The eagle | A **UFO** with a tractor beam (you hear a warble 3 seconds before) |
 
-The whole place glows: a neon grid floor that pulses, ships with glowing engine trails, hologram portals, neon dust and meteors (rain becomes a **meteor shower**), a neon-lit screen, a synthwave soundtrack — and your chicken puts on an **astronaut helmet** with a glowing halo. In Settings → World you can pick **Auto** (Forest → Space → Forest…), or lock **Forest** or **Space**.
+It's a calm, dark look: steel decks, a starry void, faint dust and meteors (rain becomes a **meteor shower**), a synthwave soundtrack — and your chicken puts on an **astronaut helmet**. On the home screen's **Stage** picker you can choose **Auto** (Forest → Space → Forest…), or lock **Forest** or **Space**.
 
 ## Share your score 📸
 
@@ -91,12 +104,16 @@ The game slowly cycles from **day** to **sunset**, **night** and **dawn** as you
 
 ## Music & settings
 
-A live-composed soundtrack plays in the background — bouncy by day, calm at night, floaty in space — with its own **volume slider**. The eagle's cry, the train horn and the crossing bell are real recordings. Settings is split into tabs — **Controls** (camera view, swipe style, D-pad and its layout), **World** (time of day and weather), **Audio** (music and sound effects) and **Display** (graphics quality and title font). Your top score, coins, outfits and missions are saved on your device.
+A live-composed soundtrack plays in the background — bouncy by day, calm at night, floaty in space — with its own **volume slider**. The eagle's cry, the train horn, the crossing bell, car and truck horns, the ambulance siren, the splash and the chicken's squawk are real recordings. Settings is split into tabs — **Controls** (camera view, swipe style, D-pad and its layout), **World** (time of day and weather), **Audio** (music and sound effects) and **Display** (graphics quality and title font). Your top score, coins, outfits and missions are saved on your device.
 
 ## Sound credits
 
 - Bald eagle call — U.S. National Park Service (public domain), via Wikimedia Commons.
 - Train horn — "Nathan M5" by HarveyHenkelmann (CC0), via Wikimedia Commons.
 - Bell — "Old school bell 4" by ezwa (public domain), via Wikimedia Commons.
+- Car horn — "Car Horn" (CC0), via Wikimedia Commons.
+- Siren — "American police siren i" by lezer (public domain), via Wikimedia Commons.
+- Splash — "Bathtub water splashes" by gradha (public domain), via Wikimedia Commons.
+- Chicken — "Hen announcing she's lain an egg" by alys (public domain), via Wikimedia Commons.
 
 Enjoy the ride! 🚗🚆🐔

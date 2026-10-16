@@ -74,7 +74,13 @@ var Missions = (function () {
     cb = callbacks || {};
     var s = null;
     try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* fresh */ }
-    state = s && s.missions ? s : { missions: [], daily: null, streak: 0, lastDone: '', completed: 0 };
+    state = { missions: [], daily: null, streak: 0, lastDone: '', completed: 0 };
+    if (s && typeof s === 'object') {
+      if (Array.isArray(s.missions)) state.missions = s.missions;
+      if (s.daily && typeof s.daily === 'object') state.daily = s.daily;
+      ['streak', 'completed'].forEach(function (k) { if (typeof s[k] === 'number') state[k] = s[k]; });
+      if (typeof s.lastDone === 'string') state.lastDone = s.lastDone;
+    }
     ensureFresh();
     save();
   }

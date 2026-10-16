@@ -50,23 +50,76 @@ var Cosmetics = (function () {
       var o = [B(0, 0.9, 0, 0.44, 0.1, 0.42, 0xffd54f), B(0, 0.99, 0.17, 0.08, 0.14, 0.08, 0xffd54f), B(0, 0.99, -0.17, 0.08, 0.14, 0.08, 0xffd54f), B(0, 0.9, 0.22, 0.07, 0.07, 0.03, 0xe53935)];
       [-1, 1].forEach(function (sx) { [-1, 1].forEach(function (sz) { o.push(B(sx * 0.17, 0.99, sz * 0.16, 0.08, 0.1, 0.08, 0xffd54f)); }); });
       return o;
-    }, px: [[4, 3, 6, 2, '#ffd54f'], [4, 2, 1, 1, '#ffd54f'], [6, 1, 2, 2, '#ffd54f'], [9, 2, 1, 1, '#ffd54f'], [6, 4, 2, 1, '#e53935']] }
+    }, px: [[4, 3, 6, 2, '#ffd54f'], [4, 2, 1, 1, '#ffd54f'], [6, 1, 2, 2, '#ffd54f'], [9, 2, 1, 1, '#ffd54f'], [6, 4, 2, 1, '#e53935']] },
+    { id: 'chef', name: 'Chef Hat', slot: 'head', price: 110, boxes: function () {
+      return [B(0, 0.93, 0, 0.5, 0.1, 0.48, 0xf0f0f0), B(0, 1.1, 0, 0.62, 0.26, 0.6, 0xffffff), B(0, 1.3, 0, 0.46, 0.14, 0.44, 0xffffff), B(0.2, 1.2, 0.2, 0.2, 0.2, 0.2, 0xf7f7f7)];
+    }, px: [[4, 3, 6, 1, '#f0f0f0'], [3, 1, 8, 2, '#fff'], [4, 0, 6, 1, '#fff']] },
+    { id: 'tophat', name: 'Top Hat', slot: 'head', price: 200, boxes: function () {
+      return [B(0, 0.89, 0, 0.72, 0.05, 0.66, 0x1c1c22), B(0, 1.12, 0, 0.42, 0.42, 0.4, 0x24242c), B(0, 0.98, 0, 0.44, 0.1, 0.42, 0xc62828)];
+    }, px: [[5, 0, 4, 3, '#24242c'], [5, 2, 4, 1, '#c62828'], [2, 3, 10, 1, '#1c1c22']] },
+    { id: 'pirate', name: 'Pirate Hat', slot: 'head', price: 130, boxes: function () {
+      return [B(0, 0.91, 0, 0.82, 0.1, 0.5, 0x1c1c22), B(0, 1.0, 0, 0.52, 0.12, 0.44, 0x2a2a33), B(-0.38, 0.98, 0, 0.1, 0.16, 0.44, 0x1c1c22), B(0.38, 0.98, 0, 0.1, 0.16, 0.44, 0x1c1c22),
+        B(0, 0.99, 0.23, 0.12, 0.12, 0.03, 0xffffff), B(0, 0.96, 0.23, 0.04, 0.04, 0.03, 0x111111)];
+    }, px: [[3, 2, 8, 2, '#2a2a33'], [1, 3, 12, 1, '#1c1c22'], [6, 3, 2, 1, '#fff']] },
+    { id: 'viking', name: 'Viking Helm', slot: 'head', price: 160, boxes: function () {
+      return [B(0, 0.93, 0, 0.52, 0.14, 0.5, 0x9e9e9e), B(0, 1.02, 0, 0.3, 0.06, 0.3, 0xb8b8b8), B(-0.32, 1.02, 0, 0.1, 0.2, 0.1, 0xf5f0dc), B(0.32, 1.02, 0, 0.1, 0.2, 0.1, 0xf5f0dc),
+        B(-0.36, 1.16, 0, 0.08, 0.14, 0.08, 0xf5f0dc), B(0.36, 1.16, 0, 0.08, 0.14, 0.08, 0xf5f0dc)];
+    }, px: [[3, 3, 8, 2, '#9e9e9e'], [2, 1, 1, 3, '#f5f0dc'], [11, 1, 1, 3, '#f5f0dc'], [1, 0, 1, 1, '#f5f0dc'], [12, 0, 1, 1, '#f5f0dc']] },
+    { id: 'propeller', name: 'Propeller Cap', slot: 'head', price: 120, boxes: function () {
+      return [B(0, 0.92, 0, 0.5, 0.1, 0.48, 0x1e88e5), B(0, 1.0, 0, 0.36, 0.08, 0.34, 0xe53935), B(0, 1.08, 0, 0.05, 0.12, 0.05, 0x555555),
+        B(0, 1.17, 0, 0.56, 0.03, 0.09, 0xffd54f), B(0, 1.17, 0, 0.09, 0.03, 0.56, 0x43a047)];
+    }, px: [[4, 3, 6, 1, '#1e88e5'], [5, 2, 4, 1, '#e53935'], [3, 1, 8, 1, '#ffd54f'], [6, 0, 2, 1, '#555']] },
+    { id: 'halo', name: 'Halo', slot: 'head', price: 250, boxes: function () {
+      return [B(0, 1.14, 0.2, 0.46, 0.05, 0.06, 0xffe566), B(0, 1.14, -0.2, 0.46, 0.05, 0.06, 0xffe566), B(0.2, 1.14, 0, 0.06, 0.05, 0.34, 0xffe566), B(-0.2, 1.14, 0, 0.06, 0.05, 0.34, 0xffe566)];
+    }, px: [[3, 1, 8, 1, '#ffe566'], [2, 2, 1, 1, '#ffe566'], [11, 2, 1, 1, '#ffe566'], [3, 3, 8, 1, '#ffe566']] },
+    { id: 'flowers', name: 'Flower Crown', slot: 'head', price: 90, boxes: function () {
+      return [B(0, 0.92, 0, 0.54, 0.06, 0.52, 0x43a047), B(0.2, 0.98, 0.18, 0.12, 0.12, 0.12, 0xff6f9c), B(-0.2, 0.98, 0.18, 0.12, 0.12, 0.12, 0xffd54f),
+        B(0.22, 0.98, -0.12, 0.12, 0.12, 0.12, 0xffffff), B(-0.22, 0.98, -0.12, 0.12, 0.12, 0.12, 0xb39ddb), B(0, 0.99, 0.26, 0.12, 0.12, 0.1, 0xff8a65)];
+    }, px: [[3, 3, 8, 1, '#43a047'], [3, 2, 2, 1, '#ff6f9c'], [6, 2, 2, 1, '#ff8a65'], [9, 2, 2, 1, '#ffd54f']] },
+    { id: 'monocle', name: 'Monocle', slot: 'face', price: 80, boxes: function () {
+      return [B(0.14, 0.68, 0.29, 0.17, 0.17, 0.03, 0xffd54f), B(0.14, 0.68, 0.3, 0.1, 0.1, 0.03, 0xcfefff), B(0.2, 0.52, 0.29, 0.02, 0.2, 0.02, 0xffd54f)];
+    }, px: [[8, 6, 3, 3, '#ffd54f'], [9, 7, 1, 1, '#cfefff'], [10, 9, 1, 2, '#ffd54f']] },
+    { id: 'scarf', name: 'Cozy Scarf', slot: 'face', price: 75, boxes: function () {
+      return [B(0, 0.3, 0, 0.6, 0.12, 0.56, 0xe53935), B(0, 0.3, 0.2, 0.62, 0.05, 0.2, 0xffffff), B(0.18, 0.18, 0.3, 0.14, 0.26, 0.05, 0xe53935), B(0.18, 0.1, 0.3, 0.14, 0.05, 0.05, 0xffffff)];
+    }, px: [[3, 10, 8, 1, '#e53935'], [3, 11, 2, 1, '#fff'], [9, 11, 2, 2, '#e53935']] },
+  ];
+
+
+  // ---------------------------------------------------------------- effects
+  // Hop effects: little particles that follow every hop. One can be worn at a time.
+  // up: initial upward speed (negative gravity floats up), seq: cycle through the colours in order.
+  var FX = [
+    { id: 'sparkle', name: 'Sparkles', icon: '✨', price: 80,  colors: [0xfff3a0, 0xffd23f, 0xffffff], up: 2.2, gravity: 3,  size: 0.09, life: 0.6 },
+    { id: 'hearts',  name: 'Hearts',   icon: '💗', price: 100, colors: [0xff6f9c, 0xff3d7f, 0xffb3cf], up: 1.4, gravity: -1.2, size: 0.11, life: 0.9 },
+    { id: 'rainbow', name: 'Rainbow',  icon: '🌈', price: 200, colors: [0xff5a5f, 0xff9f1c, 0xffd23f, 0x5cb83f, 0x3d8bff, 0xc36bff], up: 0.2, gravity: 0, size: 0.13, life: 0.7, seq: true },
+    { id: 'petals',  name: 'Petals',   icon: '🌸', price: 110, colors: [0xffc1d9, 0xffffff, 0xff9ec4], up: 1, gravity: 1.2, size: 0.1, life: 1.1 },
+    { id: 'snow',    name: 'Snowfall', icon: '❄️', price: 120, colors: [0xffffff, 0xdff3ff, 0xbfe6ff], up: 0.6, gravity: 1, size: 0.09, life: 1.1 },
+    { id: 'embers',  name: 'Embers',   icon: '🔥', price: 160, colors: [0xff7a1a, 0xffb02e, 0xfff3b0], up: 1.8, gravity: -2, size: 0.09, life: 0.8 },
+    { id: 'bubbles', name: 'Bubbles',  icon: '🫧', price: 90,  colors: [0xcff1ff, 0x9be0ff, 0xffffff], up: 1.2, gravity: -1.5, size: 0.12, life: 1 }
   ];
 
   // ---------------------------------------------------------------- state
   var state = load();
+  var fxCur = fxById(state.fx);   // the worn hop effect (cached: the player asks for it every frame)
 
   function load() {
     var s = null;
     try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* fresh start */ }
-    if (!s || !s.skins) s = { skins: ['classic'], outfits: [], skin: 'classic', head: null, face: null };
-    return s;
+    // fill in anything an older or damaged save is missing
+    var d = { skins: ['classic'], outfits: [], fxOwned: [], skin: 'classic', head: null, face: null, fx: null };
+    if (s && typeof s === 'object') {
+      ['skins', 'outfits', 'fxOwned'].forEach(function (k) { if (Array.isArray(s[k])) d[k] = s[k]; });
+      ['skin', 'head', 'face', 'fx'].forEach(function (k) { if (typeof s[k] === 'string') d[k] = s[k]; });
+    }
+    if (d.skins.indexOf('classic') < 0) d.skins.unshift('classic');
+    return d;
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private mode */ }
   }
 
   function skinById(id) { return SKINS.filter(function (s) { return s.id === id; })[0] || SKINS[0]; }
+  function fxById(id) { return FX.filter(function (f) { return f.id === id; })[0] || null; }
   function outfitById(id) { return OUTFITS.filter(function (o) { return o.id === id; })[0] || null; }
 
   function hex(c) { return '#' + ('000000' + c.toString(16)).slice(-6); }
@@ -96,11 +149,32 @@ var Cosmetics = (function () {
     return { skin: skinById(state.skin), head: outfitById(state.head), face: outfitById(state.face) };
   }
 
+  function itemOf(kind, id) { return kind === 'skin' ? skinById(id) : kind === 'fx' ? fxById(id) : outfitById(id); }
+  function ownedList(kind) { return kind === 'skin' ? state.skins : kind === 'fx' ? state.fxOwned : state.outfits; }
+  function rarity(price) { return price <= 70 ? 'Common' : price <= 140 ? 'Uncommon' : price <= 250 ? 'Rare' : 'Epic'; }
+
   return {
     SKINS: SKINS,
     OUTFITS: OUTFITS,
-    skinById: skinById,
-    outfitById: outfitById,
+    FX: FX,
+    itemOf: itemOf,
+    rarity: rarity,
+    // the hop effect being worn (or null)
+    fx: function () { return fxCur; },
+    // Mystery chest: a random item you don't own yet (cheaper items are more likely). null = you own everything.
+    chestPick: function () {
+      var pool = [];
+      [['skin', SKINS], ['outfit', OUTFITS], ['fx', FX]].forEach(function (g) {
+        g[1].forEach(function (it) {
+          if (ownedList(g[0]).indexOf(it.id) < 0 && it.price > 0) pool.push({ kind: g[0], id: it.id, w: 1 / Math.sqrt(it.price) });
+        });
+      });
+      if (!pool.length) return null;
+      var tot = pool.reduce(function (a, p) { return a + p.w; }, 0), r = Math.random() * tot;
+      for (var i = 0; i < pool.length; i++) { r -= pool[i].w; if (r <= 0) return pool[i]; }
+      return pool[pool.length - 1];
+    },
+    CHEST_PRICE: 90,
     current: current,
     svg: svg,
     // 3D accessories for whatever is equipped
@@ -109,33 +183,33 @@ var Cosmetics = (function () {
       [look.face, look.head].forEach(function (o) { if (o) out = out.concat(o.boxes()); });
       return out;
     },
-    owned: function (kind, id) {
-      return kind === 'skin' ? state.skins.indexOf(id) >= 0 : state.outfits.indexOf(id) >= 0;
-    },
+    owned: function (kind, id) { return ownedList(kind).indexOf(id) >= 0; },
     isEquipped: function (kind, id) {
       if (kind === 'skin') return state.skin === id;
+      if (kind === 'fx') return state.fx === id;
       var o = outfitById(id);
       return !!o && state[o.slot] === id;
     },
-    price: function (kind, id) {
-      return (kind === 'skin' ? skinById(id) : outfitById(id)).price;
-    },
+    price: function (kind, id) { return itemOf(kind, id).price; },
     buy: function (kind, id) {
       if (this.owned(kind, id)) return;
-      (kind === 'skin' ? state.skins : state.outfits).push(id);
+      ownedList(kind).push(id);
       save();
     },
     // Skins: pick one. Outfits: one per slot; equipping the worn one takes it off.
     equip: function (kind, id) {
       if (!this.owned(kind, id)) return;
       if (kind === 'skin') state.skin = id;
+      else if (kind === 'fx') { state.fx = state.fx === id ? null : id; fxCur = fxById(state.fx); }
       else {
         var o = outfitById(id);
         state[o.slot] = state[o.slot] === id ? null : id;
       }
       save();
     },
-    ownedCount: function () { return state.skins.length + state.outfits.length; },
-    totalCount: function () { return SKINS.length + OUTFITS.length; }
+    ownedCount: function () { return state.skins.length + state.outfits.length + state.fxOwned.length; },
+    // chickens + outfits you bought (not the free Classic, not hop effects): for the "Fashionista" trophy
+    wardrobeCount: function () { return state.skins.length - 1 + state.outfits.length; },
+    totalCount: function () { return SKINS.length + OUTFITS.length + FX.length; }
   };
 })();

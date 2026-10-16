@@ -1,19 +1,19 @@
-// Space atmosphere: neon meteors streak across the sky and glowing dust drifts by.
+// Space atmosphere: faint meteors streak across the sky and pale dust drifts by.
 // (Plugged into Weather through the theme's `fx` hook; invisible outside space.)
 var SpaceFx = (function () {
   var METEOR_MAX = 20, DUST_MAX = 170;
   var scene = null;
-  var sets = [];                 // two line sets: cyan and magenta meteors
+  var sets = [];                 // the meteor line sets (one today; the loop below handles any number)
   var dust = null, dustPos = null;
   var meteorAmt = 0;
 
   function init(sc) {
     scene = sc;
-    [0x00e5ff, 0xff2bd6].forEach(function (color) {
+    [0xffd9b0].forEach(function (color) {
       var pos = new Float32Array(METEOR_MAX * 6);
       var g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
-      var lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+      var lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.NormalBlending }));
       lines.frustumCulled = false;
       lines.visible = false;
       scene.add(lines);
@@ -24,7 +24,7 @@ var SpaceFx = (function () {
 
     dustPos = new Float32Array(DUST_MAX * 3);
     var colors = new Float32Array(DUST_MAX * 3);
-    var palette = [new THREE.Color(0x00e5ff), new THREE.Color(0xff2bd6), new THREE.Color(0x9d4dff), new THREE.Color(0xffffff), new THREE.Color(0x39ff88)];
+    var palette = [new THREE.Color(0xffffff), new THREE.Color(0xc8d4f0), new THREE.Color(0xffffff), new THREE.Color(0xe8e0d0)];
     for (var d = 0; d < DUST_MAX; d++) {
       dustPos[d * 3] = Utils.randRange(-18, 18); dustPos[d * 3 + 1] = Utils.randRange(0.2, 9); dustPos[d * 3 + 2] = Utils.randRange(-18, 18);
       var c = palette[d % palette.length];
@@ -33,7 +33,7 @@ var SpaceFx = (function () {
     var dg = new THREE.BufferGeometry();
     dg.setAttribute('position', new THREE.BufferAttribute(dustPos, 3).setUsage(THREE.DynamicDrawUsage));
     dg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    dust = new THREE.Points(dg, new THREE.PointsMaterial({ vertexColors: true, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+    dust = new THREE.Points(dg, new THREE.PointsMaterial({ vertexColors: true, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
     dust.frustumCulled = false;
     dust.visible = false;
     scene.add(dust);
@@ -45,24 +45,25 @@ var SpaceFx = (function () {
     var showDust = mix > 0.02;
     dust.visible = showDust;
     if (showDust) {
-      dust.material.opacity = (0.4 + 0.15 * Math.sin(time * 2.3)) * mix;
+      dust.material.opacity = (0.4 + 0.1 * Math.sin(time * 2.3)) * mix;
       var nd = level === 'high' ? DUST_MAX : level === 'medium' ? 110 : 60;
       for (var d = 0; d < nd; d++) {
         var o = d * 3;
         dustPos[o + 1] += dt * 0.12;
         if (dustPos[o + 1] > 9.5) dustPos[o + 1] = 0.2;
         // keep the field centred on the camera as it moves
-        if (dustPos[o] < camX - 18) dustPos[o] += 36; else if (dustPos[o] > camX + 18) dustPos[o] -= 36;
-        if (dustPos[o + 2] < camZ - 18) dustPos[o + 2] += 36; else if (dustPos[o + 2] > camZ + 18) dustPos[o + 2] -= 36;
+        dustPos[o] = camX + ((dustPos[o] - camX + 18) % 36 + 36) % 36 - 18;         // wraps however far the camera jumped
+        dustPos[o + 2] = camZ + ((dustPos[o + 2] - camZ + 18) % 36 + 36) % 36 - 18;
       }
       dust.geometry.setDrawRange(0, nd);
       dust.geometry.attributes.position.needsUpdate = true;
     }
     var on = meteorAmt > 0.02 && mix > 0.02;
-    sets.forEach(function (set) {
+    for (var si = 0; si < sets.length; si++) {
+      var set = sets[si];
       set.lines.visible = on;
-      if (!on) return;
-      set.lines.material.opacity = Math.min(0.8, 0.3 + meteorAmt * 0.5);
+      if (!on) continue;
+      set.lines.material.opacity = Math.min(0.6, 0.25 + meteorAmt * 0.4);
       var count = Math.max(2, Math.round(METEOR_MAX * meteorAmt * (level === 'low' ? 0.5 : 1)));
       var p = set.pos;
       for (var i = 0; i < METEOR_MAX; i++) {
@@ -82,7 +83,7 @@ var SpaceFx = (function () {
         if (m.y < 0.2) { m.alive = false; m.wait = Utils.randRange(0.2, 2.5) / Math.max(0.3, meteorAmt); p[k] = p[k + 1] = p[k + 2] = p[k + 3] = p[k + 4] = p[k + 5] = 0; }
       }
       set.lines.geometry.attributes.position.needsUpdate = true;
-    });
+    }
   }
 
   function label(info) {

@@ -18,7 +18,7 @@ var Weather = (function () {
   var rain = 0, fog = 0;     // current intensities 0..1
   var target = { rain: 0, fog: 0 };
   var nextChange = 30;       // row at which auto weather picks something new
-  var flash = 0, thunderTimer = 8, flickerT = -1;
+  var flash = 0, thunderTimer = 8, flickerT = -1, flashColor = 0xe8f0ff;
   var rainLines = null, rainPos = null, rainVel = null;
   var rainCount = 400;
   var tmpA = new THREE.Color(), tmpB = new THREE.Color();
@@ -26,18 +26,20 @@ var Weather = (function () {
   var activeTheme = null;          // the theme whose sky is (fading) in
   var GRAY = new THREE.Color(0x93a1ad);
 
+  // The sky for a time of day. Fills (and returns) one shared object, so nothing is
+  // allocated per frame; copy it if you need to keep it.
+  var goalBuf = { sky: new THREE.Color(), ambC: new THREE.Color(), sunC: new THREE.Color(), ambI: 0, sunI: 0, night: 0 };
   function sample(t) {
     for (var i = 0; i < TRACK.length - 1; i++) {
       var a = TRACK[i], b = TRACK[i + 1];
       if (t <= b[0]) {
-        var k = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
-        return {
-          sky: tmpA.setHex(a[1].sky).lerp(tmpB.setHex(b[1].sky), k).clone(),
-          ambC: tmpA.setHex(a[1].ambC).lerp(tmpB.setHex(b[1].ambC), k).clone(),
-          sunC: tmpA.setHex(a[1].sunC).lerp(tmpB.setHex(b[1].sunC), k).clone(),
-          ambI: Utils.lerp(a[1].ambI, b[1].ambI, k), sunI: Utils.lerp(a[1].sunI, b[1].sunI, k),
-          night: Utils.lerp(a[1].night, b[1].night, k)
-        };
+        var k = (t - a[0]) / Math.max(1e-6, b[0] - a[0]), o = goalBuf;
+        o.sky.setHex(a[1].sky).lerp(tmpB.setHex(b[1].sky), k);
+        o.ambC.setHex(a[1].ambC).lerp(tmpB.setHex(b[1].ambC), k);
+        o.sunC.setHex(a[1].sunC).lerp(tmpB.setHex(b[1].sunC), k);
+        o.ambI = Utils.lerp(a[1].ambI, b[1].ambI, k); o.sunI = Utils.lerp(a[1].sunI, b[1].sunI, k);
+        o.night = Utils.lerp(a[1].night, b[1].night, k);
+        return o;
       }
     }
     return sample(0);
@@ -94,6 +96,12 @@ var Weather = (function () {
     else { target.rain = 0; target.fog = Utils.randRange(0.6, 1); nextChange = rows + Utils.randInt(50, 90); }
   }
 
+  // A sudden flash that lights up the whole field (a lightning strike; themes can tint it).
+  function strike(color) {
+    flashColor = color || 0xe8f0ff;
+    flash = 1; flickerT = 0.14;
+  }
+
   function setModes(tod, wx) {
     timeMode = tod; weatherMode = wx;
   }
@@ -102,7 +110,7 @@ var Weather = (function () {
   function setBiome(name, snap) {
     var T = Biome.theme(name);
     if (T.sky) { activeTheme = T; skyTarget = 1; } else skyTarget = 0;
-    if (snap) { skyMix = skyTarget; if (!skyTarget) activeTheme = null; }
+    if (snap) skyMix = skyTarget;      // (a theme fades out through its own update, which hides its effects)
   }
 
   // Back to a clear morning (new run). snap = jump there instantly.
@@ -111,7 +119,7 @@ var Weather = (function () {
     target.rain = target.fog = 0;
     nextChange = Utils.randInt(25, 40);
     flash = 0; thunderTimer = 8;
-    if (snap) { cur = null; skyMix = skyTarget; if (!skyTarget) activeTheme = null; }
+    if (snap) { cur = null; skyMix = skyTarget; }
   }
 
   function timeOfDay(rows) {
@@ -141,8 +149,8 @@ var Weather = (function () {
       thunderTimer -= dt;
       if (thunderTimer <= 0) {
         thunderTimer = Utils.randRange(7, 16);
-        flash = 1; flickerT = 0.14;
-        if (GameAudio) GameAudio.thunder(Utils.randRange(0.25, 1.1));
+        strike();
+        GameAudio.thunder(Utils.randRange(0.25, 1.1));
       }
     }
     if (flickerT > 0) { flickerT -= dt; if (flickerT <= 0) flash = 0.8; }
@@ -160,7 +168,9 @@ var Weather = (function () {
       goal.sunI = Utils.lerp(goal.sunI, TS.sunI, skyMix);
       goal.night = Utils.lerp(goal.night, TS.night, skyMix);
     }
-    if (!cur) { cur = goal; } else {
+    if (!cur) {
+      cur = { sky: goal.sky.clone(), ambC: goal.ambC.clone(), sunC: goal.sunC.clone(), ambI: goal.ambI, sunI: goal.sunI, night: goal.night };
+    } else {
       var k = 1 - Math.exp(-dt * 2.2);
       cur.sky.lerp(goal.sky, k); cur.ambC.lerp(goal.ambC, k); cur.sunC.lerp(goal.sunC, k);
       cur.ambI += (goal.ambI - cur.ambI) * k; cur.sunI += (goal.sunI - cur.sunI) * k;
@@ -173,7 +183,7 @@ var Weather = (function () {
     tmpA.copy(GRAY).multiplyScalar(0.22 + 0.78 * (1 - cur.night));
     if (TS && TS.fog !== undefined) tmpA.lerp(tmpB.setHex(TS.fog), skyMix);   // fog takes the theme's tint
     bgColor.copy(cur.sky).lerp(tmpA, 0.6 * gloom);
-    if (flash > 0) bgColor.lerp(tmpB.setHex(0xe8f0ff), flash * 0.5);
+    if (flash > 0) bgColor.lerp(tmpB.setHex(flashColor), flash * 0.5);
     scene.fog.color.copy(bgColor);
     var fogAmt = Math.max(fog, rainReal * 0.45);
     scene.fog.near = Utils.lerp(30, 11, fogAmt);
@@ -236,6 +246,7 @@ var Weather = (function () {
     init: init,
     setModes: setModes,
     setBiome: setBiome,
+    strike: strike,
     reset: reset,
     update: update,
     timeMode: function () { return timeMode; },
@@ -243,7 +254,6 @@ var Weather = (function () {
     get rain() { return rain * (1 - skyMix); },
     get themeMix() { return skyMix; },
     get themeName() { return activeTheme ? activeTheme.name : null; },
-    get fog() { return fog; },
     get night() { return cur ? cur.night : 0; },
     label: function () {
       var n = cur ? cur.night : 0;

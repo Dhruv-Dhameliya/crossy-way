@@ -7,7 +7,6 @@ var Textures = (function () {
   var materialCache = {};
   var geometryCache = {};
   var waterTextures = [];
-  var glowMaterials = [];   // lane materials with a glow layer (themes can animate them)
 
   function hexCss(hex) {
     return 'rgb(' + ((hex >> 16) & 255) + ',' + ((hex >> 8) & 255) + ',' + (hex & 255) + ')';
@@ -146,13 +145,28 @@ var Textures = (function () {
       var top = CONFIG.ROW_TOP[type];
       var height = top - CONFIG.ROW_BOTTOM;
       var geo = new THREE.BoxGeometry((CONFIG.GROUND_VISUAL_HALF * 2 + 1) * CONFIG.TILE, height, CONFIG.TILE);
+      // Two draw calls instead of six: the five side faces share one material, the top
+      // face (the only one you really see) has its own. Reorder the index buffer so the
+      // top comes last, then describe the two ranges as groups.
+      var idx = geo.index.array, out = new idx.constructor(idx.length), o = 0, k;
+      [0, 1, 3, 4, 5, 2].forEach(function (face) { for (k = 0; k < 6; k++) out[o++] = idx[face * 6 + k]; });
+      geo.setIndex(new THREE.BufferAttribute(out, 1));
+      geo.clearGroups();
+      geo.addGroup(0, 30, 0);
+      geo.addGroup(30, 6, 1);
       geo.__shared = true;
       geometryCache[key] = geo;
     }
     return geometryCache[key];
   }
 
-  // BoxGeometry material order: +x, -x, +y, -y, +z, -z
+  // Helpers a biome theme can use to paint its own lane textures.
+  var kit = {
+    makeTexture: makeTexture, rng: rng, speckle: speckle, hexCss: hexCss, shadeCss: shadeCss,
+    addWater: function (tex) { waterTextures.push(tex); return tex; }   // drifts like a river surface
+  };
+
+  // The ground uses two materials: [sides, top] (see getGroundGeometry).
   // variant: undefined | 'ice' (on a grass lane) | 'void' (on a water-type lane)
   // A biome theme may supply its own ground (theme.ground); returning null falls
   // back to the normal textures below.
@@ -198,9 +212,8 @@ var Textures = (function () {
       ? new THREE.MeshLambertMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex.glowMap })
       : new THREE.MeshLambertMaterial({ map: tex });
     top.__shared = true;
-    if (tex.glowMap) glowMaterials.push(top);
     var s = sideMat(side);
-    var set = [s, s, top, s, s, s];
+    var set = [s, top];
     materialCache[key] = set;
     return set;
   }
@@ -212,17 +225,10 @@ var Textures = (function () {
     }
   }
 
-  // Helpers a biome theme can use to paint its own lane textures.
-  var kit = {
-    makeTexture: makeTexture, rng: rng, speckle: speckle, hexCss: hexCss, shadeCss: shadeCss,
-    addWater: function (tex) { waterTextures.push(tex); return tex; }   // drifts like a river surface
-  };
-
   return {
     getGroundGeometry: getGroundGeometry,
     getGroundMaterials: getGroundMaterials,
     update: update,
-    kit: kit,
-    glowMaterials: glowMaterials
+    kit: kit
   };
 })();

@@ -1,16 +1,18 @@
 // Scene/camera setup, input, scoring (combos), power-ups, shop, missions,
 // weather, music, adaptive quality, game loop and UI.
 (function () {
+  // localStorage can throw (blocked site data, private mode, full): never let that stop the game.
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
+
   var scene, camera, renderer, clock;
   var world, player;
   var state = 'start'; // start | playing | gameover
-  var runCoins = 0;
-  var totalCoins = parseInt(localStorage.getItem(CONFIG.COINS_KEY) || '0', 10) || 0;
+  var totalCoins = parseInt(lsGet(CONFIG.COINS_KEY) || '0', 10) || 0;
   var bestScore = readBest();
-  var lastDeath = null;
 
   var backdrop, ambientLight, sunLight;
-  var cameraLean = localStorage.getItem(CONFIG.LEAN_KEY) || 'right';
+  var cameraLean = lsGet(CONFIG.LEAN_KEY) || 'right';
   var settingsOpen = false;     // true while ANY modal (settings / shop / missions) is open
   var modalEl = null;
   var panelHiddenForModal = null;
@@ -18,11 +20,15 @@
   // camera rig: camX/camZ is the point the camera looks at; it simply follows
   // the chicken so the chicken stays near the middle of the screen.
   var camX = 0, camZ = CONFIG.CAMERA_LEAD;
+  var shopTab = 'skin';
+  var runTrophies = [];       // trophies unlocked during the current run (shown on the game-over card)
+  var wasThemeMood = false;  // the music was playing a biome's own mood a moment ago
+  var gameOverAt = 0;     // when the last run ended (a held key must not skip the game-over card)
   var idleTimer = 0;      // seconds since the chicken last reached a new row
   var shakeT = 0;
   var eagleCried = false;   // the eagle's screech has been played for this idle spell
   var curBiome = 'forest';  // biome of the row the chicken stands on (sky, helmet, music follow it)
-  var shareBlob = null, shareUrl = null;
+  var shareBlob = null, shareUrl = null, shareReq = 0;
   var bdMix = -1, bdColor = new THREE.Color();   // backdrop colour follows the active biome theme
   var camKick = 0;          // little camera dip on every landing
   var tmpV = new THREE.Vector3();
@@ -39,7 +45,7 @@
   var lastRow = 0;
   var lastComboCount = -1;
   var wxTimer = 0;
-  var swipeStyle = localStorage.getItem(CONFIG.SWIPE_KEY) || 'cam'; // 'cam' = follow the camera, 'classic'
+  var swipeStyle = lsGet(CONFIG.SWIPE_KEY) || 'cam'; // 'cam' = follow the camera, 'classic'
   var dpadOn = false;
 
   var IS_TOUCH = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
@@ -51,6 +57,7 @@
     'startHint', 'combo', 'comboMult', 'comboCount', 'comboBar', 'pops', 'wxBadge', 'heroChick',
     'startShopBtn', 'startMissionsBtn', 'missionDot',
     'shopPanel', 'shopCoins', 'shopPreview', 'shopLook', 'shopGrid', 'shopHint', 'closeShopBtn',
+    'chestBtn', 'chestReveal', 'trophiesPanel', 'trophiesBody', 'trophyCount', 'trophyBar', 'closeTrophiesBtn', 'startTrophiesBtn', 'trophyDot', 'goTrophies',
     'sharePanel', 'shareImg', 'shareNativeBtn', 'shareSaveBtn', 'shareCopyBtn', 'closeShareBtn',
     'missionsPanel', 'missionsBody', 'closeMissionsBtn', 'musicSlider', 'musicPct', 'dpadSizeSlider', 'dpadSizePct', 'dpadSizeReset']
     .forEach(function (id) { el[id] = document.getElementById(id); });
@@ -84,7 +91,7 @@
   // eye on the frame rate and trade resolution / shadows for smoothness.
   // ===================================================================
   var LEVELS = ['low', 'medium', 'high'];
-  var quality = { mode: localStorage.getItem(CONFIG.QUALITY_KEY) || 'auto', level: 'high', scale: 1 };
+  var quality = { mode: lsGet(CONFIG.QUALITY_KEY) || 'auto', level: 'high', scale: 1 };
   var fps = { acc: 0, n: 0, warm: 0, cooldown: 0 };
 
   function currentLevel() { return quality.mode === 'auto' ? quality.level : quality.mode; }
@@ -136,7 +143,7 @@
   function applyCameraLean(lean) {
     cameraLean = lean;
     CONFIG.CAMERA_OFFSET.x = (lean === 'right' ? -1 : 1) * CONFIG.CAMERA_OFFSET_X_MAGNITUDE;
-    localStorage.setItem(CONFIG.LEAN_KEY, lean);
+    lsSet(CONFIG.LEAN_KEY, lean);
     if (camera) {
       camera.position.set(camX + CONFIG.CAMERA_OFFSET.x, CONFIG.CAMERA_OFFSET.y, camZ + CONFIG.CAMERA_OFFSET.z);
       camera.lookAt(camX, 0, camZ);
@@ -210,9 +217,11 @@
     applyQuality();
 
     Weather.init(scene, ambientLight, sunLight);
-    Weather.setModes(localStorage.getItem(CONFIG.TOD_KEY) || 'auto', localStorage.getItem(CONFIG.WEATHER_KEY) || 'auto');
+    Weather.setModes(lsGet(CONFIG.TOD_KEY) || 'auto', lsGet(CONFIG.WEATHER_KEY) || 'auto');
     Weather.reset(true);
 
+    Achievements.init({ onUnlock: onTrophy });
+    Achievements.event('owned', Cosmetics.wardrobeCount(), true);
     Missions.init({
       onReward: function (n) { giveCoins(n); },
       onComplete: onMissionComplete
@@ -225,13 +234,13 @@
     player.onCoin = function () { addCoins(1); };
     player.onItem = onItemCollected;
     player.onDeath = onPlayerDeath;
-    player.onLand = function () { camKick = 0.05; };
+    player.onLand = function () { camKick = 0.05; Achievements.event('hops', 1); };
     player.onEagleGrab = function () {
       shakeT = 0.4; vibrate([30, 40, 60]);
       el.flash.classList.remove('on'); void el.flash.offsetWidth; el.flash.classList.add('on');
     };
     player.onShieldPop = function () {
-      if (GameAudio) GameAudio.pop();
+      GameAudio.pop();
       vibrate(30);
       endPower('shield', true);
       showToast('🛡️ SHIELD BROKE!', '#3d8bff');
@@ -251,20 +260,27 @@
     window.addEventListener('orientationchange', function () { setTimeout(onResize, 200); });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden && state === 'playing' && !settingsOpen) openModal(el.settingsPanel);
-      if (document.hidden) Missions.runEnd();
+      if (document.hidden) { Missions.runEnd(); Achievements.flush(); }
       clock.getDelta();
     });
+    window.addEventListener('pagehide', function () { Achievements.flush(); });
     window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     setupInput();
-    applyTitleFont(localStorage.getItem(CONFIG.FONT_KEY) || 'bold');
-    applySound((localStorage.getItem(CONFIG.SOUND_KEY) || 'on') !== 'off');
-    applyDpad(localStorage.getItem(CONFIG.DPAD_KEY) === 'on');
-    applyDpadSwap(localStorage.getItem(CONFIG.DPAD_SWAP_KEY) === 'on');
-    var savedSize = parseInt(localStorage.getItem(CONFIG.DPAD_SIZE_KEY), 10);
+    applyTitleFont(lsGet(CONFIG.FONT_KEY) || 'bold');
+    applySound((lsGet(CONFIG.SOUND_KEY) || 'on') !== 'off');
+    applyDpad(lsGet(CONFIG.DPAD_KEY) === 'on');
+    applyDpadSwap(lsGet(CONFIG.DPAD_SWAP_KEY) === 'on');
+    var savedSize = parseInt(lsGet(CONFIG.DPAD_SIZE_KEY), 10);
     applyDpadSize(isNaN(savedSize) ? defaultDpadSize() : savedSize, false);
     applySwipe(swipeStyle);
-    showSection(localStorage.getItem(CONFIG.TAB_KEY) || 'game');
+    showSection(lsGet(CONFIG.TAB_KEY) || 'game');
     applyDifficulty(Difficulty.mode, true);
+    // the stage picker only offers biomes that are installed
+    el.biomeButtons.forEach(function (b) {
+      var v = b.getAttribute('data-biome');
+      if (v !== 'auto' && !Biome.themes[v]) b.classList.add('hidden');
+    });
+    if (Biome.list().length < 2) document.querySelector('.stage-pick').classList.add('hidden');
     applyBiome(Biome.mode, true);
     syncBiome(true);
     applyTod(Weather.timeMode());
@@ -284,6 +300,7 @@
   function hookWorld() {
     world.onMagnetCoin = onMagnetCoin;
     world.onNearMiss = onNearMiss;
+    world.onEvent = onWorldEvent;
     world.listener = { x: 0, z: 0, ghost: false };
   }
 
@@ -302,6 +319,7 @@
     applyFrustum();
     renderer.setSize(window.innerWidth, window.innerHeight);
     computeStartCam();
+    if (state === 'start') snapToStart();
   }
 
   // ---- camera ------------------------------------------------------------
@@ -364,12 +382,6 @@
     sunLight.position.copy(sunT).add(sunOff);
   }
 
-  // How low the chicken sits on screen: -1 is the bottom edge.
-  function playerScreenY() {
-    tmpV.set(player.group.position.x, player.group.position.y + 0.3, player.group.position.z).project(camera);
-    return tmpV.y;
-  }
-
   // ---- input ------------------------------------------------------------
   function startGameIfNeeded() {
     if (state === 'start') {
@@ -377,6 +389,8 @@
       document.body.classList.add('in-run');
       idleTimer = 0; // (the camera glides from the title view to the chicken)
       Missions.runStart();
+      Achievements.runStart();
+      runTrophies = [];
       el.startPanel.classList.add('hidden');
     }
   }
@@ -442,11 +456,11 @@
           e.preventDefault(); attemptMove(1, 0); break;
         case ' ':
           e.preventDefault();
-          if (state === 'gameover') restart(true);
+          if (state === 'gameover') { if (!e.repeat && performance.now() - gameOverAt > 600) restart(true); }
           else attemptMove(0, 1);
           break;
         case 'Enter':
-          if (state === 'gameover') restart(true);
+          if (state === 'gameover' && !e.repeat && performance.now() - gameOverAt > 600) restart(true);
           break;
       }
     });
@@ -492,7 +506,7 @@
     el.restartBtn.addEventListener('click', function () { restart(true); }); // play again: skip the home screen
     el.homeBtn.addEventListener('click', function () { restart(false); });
     el.shareBtn.addEventListener('click', openShare);
-    el.closeShareBtn.addEventListener('click', closeShare);
+    el.closeShareBtn.addEventListener('click', closeModal);
     el.shareNativeBtn.addEventListener('click', shareNative);
     el.shareSaveBtn.addEventListener('click', saveShareImage);
     el.shareCopyBtn.addEventListener('click', copyShare);
@@ -520,11 +534,16 @@
     el.infoBtn.addEventListener('click', function () { openModal(el.infoPanel); });
     el.modeBtn.addEventListener('click', function () { showSection('game'); openModal(el.settingsPanel); });
     el.diffButtons.forEach(function (b) {
-      b.addEventListener('click', function () { applyDifficulty(b.getAttribute('data-diff')); });
+      b.addEventListener('click', function () {
+        if (state !== 'start') { el.diffNote.textContent = 'Difficulty can only be changed from the home screen.'; return; }   // scores belong to one mode
+        applyDifficulty(b.getAttribute('data-diff'));
+      });
     });
     el.closeMissionsBtn.addEventListener('click', closeModal);
-    [el.startShopBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.shopPanel, renderShop); }); });
-    [el.startMissionsBtn].forEach(function (b) { b.addEventListener('click', function () { openModal(el.missionsPanel, openMissionsScreen); }); });
+    el.closeTrophiesBtn.addEventListener('click', closeModal);
+    el.startTrophiesBtn.addEventListener('click', function () { openModal(el.trophiesPanel, renderTrophies); });
+    el.startShopBtn.addEventListener('click', function () { openModal(el.shopPanel, renderShop); });
+    el.startMissionsBtn.addEventListener('click', function () { openModal(el.missionsPanel, openMissionsScreen); });
     el.shopTabs.forEach(function (t) {
       t.addEventListener('click', function () {
         shopTab = t.getAttribute('data-tab');
@@ -533,6 +552,8 @@
         renderShop();
       });
     });
+    el.chestBtn.addEventListener('click', openChest);
+    el.chestReveal.addEventListener('click', function () { el.chestReveal.classList.add('hidden'); });
     el.shopGrid.addEventListener('click', function (e) {
       var b = e.target.closest('.shop-item');
       if (b) onShopItem(b.getAttribute('data-kind'), b.getAttribute('data-id'), b);
@@ -554,7 +575,7 @@
     el.qualityButtons.forEach(function (btn) {
       btn.addEventListener('click', function () {
         quality.mode = btn.getAttribute('data-quality');
-        localStorage.setItem(CONFIG.QUALITY_KEY, quality.mode);
+        lsSet(CONFIG.QUALITY_KEY, quality.mode);
         fps.warm = 0; fps.acc = 0; fps.n = 0;
         applyQuality();
       });
@@ -607,15 +628,15 @@
 
   function applyTitleFont(font) {
     document.documentElement.setAttribute('data-title-font', font);
-    localStorage.setItem(CONFIG.FONT_KEY, font);
+    lsSet(CONFIG.FONT_KEY, font);
     el.fontButtons.forEach(function (btn) {
       btn.classList.toggle('active', btn.getAttribute('data-font') === font);
     });
   }
 
   function applySound(on) {
-    if (GameAudio) GameAudio.setEnabled(on);
-    localStorage.setItem(CONFIG.SOUND_KEY, on ? 'on' : 'off');
+    GameAudio.setEnabled(on);
+    lsSet(CONFIG.SOUND_KEY, on ? 'on' : 'off');
     el.soundButtons.forEach(function (btn) {
       btn.classList.toggle('active', btn.getAttribute('data-sound') === (on ? 'on' : 'off'));
     });
@@ -623,7 +644,7 @@
 
   function applyDpad(on) {
     dpadOn = on;
-    localStorage.setItem(CONFIG.DPAD_KEY, on ? 'on' : 'off');
+    lsSet(CONFIG.DPAD_KEY, on ? 'on' : 'off');
     el.dpad.classList.toggle('show', on);
     el.startHint.textContent = on ? 'use the D-pad or press PLAY' : 'or tap anywhere · press an arrow key';
     el.dpadOptButtons.forEach(function (btn) {
@@ -631,7 +652,6 @@
     });
   }
 
-  // Touch screens: swap which side the Up/Down pair and the Left/Right pair sit on.
   // ---- D-pad size ------------------------------------------------------------------
   // Tablets get a bigger D-pad by default; phones keep the normal size.
   function defaultDpadSize() {
@@ -642,10 +662,10 @@
     v = Utils.clamp(Math.round(v / 5) * 5, 60, 160);
     document.documentElement.style.setProperty('--dpad-scale', String(v / 100));
     el.dpadSizeSlider.value = v;
-    el.dpadSizeSlider.style.setProperty('--fill', ((v - 60) / 100 * 100) + '%');
+    el.dpadSizeSlider.style.setProperty('--fill', (v - 60) + '%');
     el.dpadSizePct.textContent = v + '%';
     if (save) {
-      try { localStorage.setItem(CONFIG.DPAD_SIZE_KEY, String(v)); } catch (e) { /* private mode */ }
+      lsSet(CONFIG.DPAD_SIZE_KEY, String(v));
     }
   }
 
@@ -667,20 +687,20 @@
   }
 
   function applyDpadSwap(swap) {
-    localStorage.setItem(CONFIG.DPAD_SWAP_KEY, swap ? 'on' : 'off');
+    lsSet(CONFIG.DPAD_SWAP_KEY, swap ? 'on' : 'off');
     document.body.classList.toggle('dpad-swap', swap);
     el.dswapButtons.forEach(function (b) { b.classList.toggle('active', (b.getAttribute('data-dswap') === 'on') === swap); });
   }
 
   function applySwipe(style) {
     swipeStyle = style;
-    localStorage.setItem(CONFIG.SWIPE_KEY, style);
+    lsSet(CONFIG.SWIPE_KEY, style);
     el.swipeButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-swipe') === style); });
   }
 
   // Settings page is split into sections (tabs); remember the last one used.
   function showSection(sec) {
-    localStorage.setItem(CONFIG.TAB_KEY, sec);
+    lsSet(CONFIG.TAB_KEY, sec);
     el.setTabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-sec') === sec); });
     el.setSecs.forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-sec') === sec); });
   }
@@ -693,7 +713,7 @@
   function readBest(mode) {
     var v = 0;
     var key = !mode ? bestKey() : (mode === 'medium' ? CONFIG.BEST_SCORE_KEY : CONFIG.BEST_SCORE_KEY + '_' + mode);
-    try { v = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) { /* private mode */ }
+    v = parseInt(lsGet(key) || '0', 10) || 0;
     return v;
   }
   // Top score of every difficulty, shown on the difficulty buttons and the HUD chip.
@@ -712,7 +732,7 @@
   function applyDifficulty(mode, silent) {
     if (!CONFIG.DIFFICULTY[mode]) mode = 'medium';
     Difficulty.mode = mode;
-    localStorage.setItem(CONFIG.DIFF_KEY, mode);
+    lsSet(CONFIG.DIFF_KEY, mode);
     var D = Difficulty.cur;
     el.diffButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-diff') === mode); });
     el.diffNote.textContent = D.blurb;
@@ -733,11 +753,11 @@
     previewWeather();
   }
 
-  // Auto walks Forest -> Space -> Forest...; the others lock one biome in.
+  // Auto walks through the installed biomes in turn; the others lock one in.
   function applyBiome(mode, silent) {
     if (!Biome.valid(mode)) mode = 'auto';
     Biome.mode = mode;
-    try { localStorage.setItem(CONFIG.BIOME_KEY, mode); } catch (e) { /* private mode */ }
+    lsSet(CONFIG.BIOME_KEY, mode);
     el.biomeButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-biome') === mode); });
     if (!silent && state === 'start') rebuildWorld();
   }
@@ -757,19 +777,19 @@
     if (changed && !snap && state === 'playing') {
       var enter = Biome.theme(b).enter;
       if (enter) showToast(enter.text, enter.color);
-      if (GameAudio) GameAudio.portal();
+      GameAudio.portal();
     }
   }
 
   function applyTod(mode) {
     Weather.setModes(mode, Weather.weatherMode());
-    localStorage.setItem(CONFIG.TOD_KEY, mode);
+    lsSet(CONFIG.TOD_KEY, mode);
     el.todButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tod') === mode); });
   }
 
   function applyWx(mode) {
     Weather.setModes(Weather.timeMode(), mode);
-    localStorage.setItem(CONFIG.WEATHER_KEY, mode);
+    lsSet(CONFIG.WEATHER_KEY, mode);
     el.wxButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-wx') === mode); });
   }
 
@@ -792,7 +812,7 @@
     settingsOpen = true;
     modalEl = panel;
     document.body.classList.add('modal-open');
-    if (GameAudio) GameAudio.setAmbience(0, 0);
+    GameAudio.setAmbience(0, 0);
     if (onOpen) onOpen();
     panel.classList.remove('hidden');
   }
@@ -800,6 +820,7 @@
   function closeModal() {
     if (!modalEl) return;
     if (modalEl === el.missionsPanel) finishMissionsScreen();
+    el.chestReveal.classList.add('hidden');
     endDpadPreview();
     modalEl.classList.add('hidden');
     modalEl = null;
@@ -814,11 +835,10 @@
   }
 
   // ---- shop ------------------------------------------------------------------
-  var shopTab = 'skin';
 
   function setCoins(n) {
     totalCoins = n;
-    try { localStorage.setItem(CONFIG.COINS_KEY, String(totalCoins)); } catch (e) { /* private mode */ }
+    lsSet(CONFIG.COINS_KEY, String(totalCoins));
     el.coins.textContent = totalCoins;
     el.shopCoins.textContent = totalCoins;
   }
@@ -830,7 +850,8 @@
     var worn = [look.head && look.head.name, look.face && look.face.name].filter(Boolean).join(' + ');
     el.shopLook.innerHTML = '<b>' + look.skin.name + '</b><small>' + (worn || 'No outfit') + '</small>' +
       '<small>' + Cosmetics.ownedCount() + ' / ' + Cosmetics.totalCount() + ' collected</small>';
-    var items = shopTab === 'skin' ? Cosmetics.SKINS : Cosmetics.OUTFITS;
+    el.chestBtn.classList.toggle('poor', totalCoins < Cosmetics.CHEST_PRICE);
+    var items = shopTab === 'skin' ? Cosmetics.SKINS : shopTab === 'fx' ? Cosmetics.FX : Cosmetics.OUTFITS;
     var html = '';
     items.forEach(function (it) {
       var owned = Cosmetics.owned(shopTab, it.id);
@@ -838,14 +859,46 @@
       var preview = shopTab === 'skin'
         ? { skin: it, head: look.head, face: look.face }
         : { skin: look.skin, head: it.slot === 'head' ? it : null, face: it.slot === 'face' ? it : null };
+      var prevHtml = shopTab === 'fx' ? '<div class="si-prev fxprev">' + it.icon + '</div>' : '<div class="si-prev">' + Cosmetics.svg(preview) + '</div>';
       var label, cls = 'shop-item';
-      if (owned) { cls += ' owned' + (worn2 ? ' equipped' : ''); label = worn2 ? (shopTab === 'skin' ? 'EQUIPPED' : 'WORN') : (shopTab === 'skin' ? 'OWNED' : 'OWNED'); }
+      if (owned) { cls += ' owned' + (worn2 ? ' equipped' : ''); label = worn2 ? (shopTab === 'skin' ? 'EQUIPPED' : 'WORN') : 'OWNED'; }
       else { label = '🪙 ' + it.price; if (totalCoins < it.price) cls += ' poor'; }
       html += '<button class="' + cls + '" data-kind="' + shopTab + '" data-id="' + it.id + '">' +
-        '<div class="si-prev">' + Cosmetics.svg(preview) + '</div>' +
+        prevHtml +
         '<div class="si-name">' + it.name + '</div><div class="si-state">' + label + '</div></button>';
     });
     el.shopGrid.innerHTML = html;
+  }
+
+  // Mystery chest: pay coins, get a random item you don't own, and wear it.
+  function openChest() {
+    if (!el.chestReveal.classList.contains('hidden')) return;
+    var pick = Cosmetics.chestPick();
+    if (!pick) { el.shopHint.textContent = 'You already own everything!'; return; }
+    if (totalCoins < Cosmetics.CHEST_PRICE) {
+      GameAudio.deny();
+      el.shopHint.textContent = 'Need ' + (Cosmetics.CHEST_PRICE - totalCoins) + ' more \uD83E\uDE99 for a chest.';
+      el.chestBtn.classList.remove('shake'); void el.chestBtn.offsetWidth; el.chestBtn.classList.add('shake');
+      return;
+    }
+    setCoins(totalCoins - Cosmetics.CHEST_PRICE);
+    Cosmetics.buy(pick.kind, pick.id);
+    Cosmetics.equip(pick.kind, pick.id);
+    Achievements.event('owned', Cosmetics.wardrobeCount(), true);
+    Achievements.event('chests', 1);
+    var it = Cosmetics.itemOf(pick.kind, pick.id);
+    var look = Cosmetics.current();
+    var prev = pick.kind === 'fx' ? '<div class="cr-prev fxprev">' + it.icon + '</div>'
+      : '<div class="cr-prev">' + Cosmetics.svg(pick.kind === 'skin' ? { skin: it, head: null, face: null } : { skin: look.skin, head: it.slot === 'head' ? it : null, face: it.slot === 'face' ? it : null }) + '</div>';
+    var rar = Cosmetics.rarity(it.price);
+    el.chestReveal.innerHTML = '<div class="cr-box">\uD83C\uDF81</div><div class="cr-item">' + prev +
+      '<div class="cr-name">' + it.name + '</div><div class="cr-rar ' + rar + '">' + rar.toUpperCase() + '</div><small>Now wearing it! Tap to continue</small></div>';
+    el.chestReveal.classList.remove('hidden');
+    if (GameAudio) { GameAudio.equip(); setTimeout(function () { GameAudio.buy(); }, 850); }
+    vibrate([20, 40, 60]);
+    applyLookChange();
+    renderShop();
+    el.shopHint.textContent = 'Tap an item to buy or wear it.';
   }
 
   function applyLookChange() {
@@ -854,12 +907,12 @@
   }
 
   function onShopItem(kind, id, btn) {
-    var name = (kind === 'skin' ? Cosmetics.skinById(id) : Cosmetics.outfitById(id)).name;
+    var name = Cosmetics.itemOf(kind, id).name;
     if (Cosmetics.owned(kind, id)) {
       var was = Cosmetics.isEquipped(kind, id);
       Cosmetics.equip(kind, id);
-      if (GameAudio) GameAudio.equip();
-      el.shopHint.textContent = kind === 'outfit' && was ? name + ' taken off.' : 'Wearing ' + name + '!';
+      GameAudio.equip();
+      el.shopHint.textContent = kind !== 'skin' && was ? name + ' taken off.' : (kind === 'fx' ? name + ' on!' : 'Wearing ' + name + '!');
       applyLookChange();
     } else {
       var price = Cosmetics.price(kind, id);
@@ -867,7 +920,8 @@
         setCoins(totalCoins - price);
         Cosmetics.buy(kind, id);
         Cosmetics.equip(kind, id);
-        if (GameAudio) GameAudio.buy();
+        Achievements.event('owned', Cosmetics.wardrobeCount(), true);
+        GameAudio.buy();
         vibrate(20);
         el.shopHint.textContent = 'Bought ' + name + '! Looking good.';
         applyLookChange();
@@ -876,7 +930,7 @@
         if (nb) nb.classList.add('bought');
         return;
       }
-      if (GameAudio) GameAudio.deny();
+      GameAudio.deny();
       el.shopHint.textContent = 'Need ' + (price - totalCoins) + ' more 🪙 for ' + name + '.';
       btn.classList.remove('shake');
       void btn.offsetWidth;
@@ -938,7 +992,7 @@
     later(function () {
       var rows = el.missionsBody.querySelectorAll('.mrow.completing, .daily-card.pending');
       for (var k = 0; k < rows.length; k++) rows[k].classList.add('green');
-      if (GameAudio) GameAudio.missionDone();
+      GameAudio.missionDone();
     }, 900);
     if (anyDone) {
       later(function () {
@@ -957,10 +1011,65 @@
 
   function giveCoins(n) { setCoins(totalCoins + n); }
 
+  // ---- trophies ----------------------------------------------------------------
+  var trophyToastAt = 0;      // when the last trophy toast was shown (so they don't overlap)
+
+  function onTrophy(d) {
+    giveCoins(d.reward);
+    runTrophies.push(d);
+    var wait = Math.max(0, trophyToastAt + 2300 - Date.now());
+    trophyToastAt = Date.now() + wait;
+    if (state === 'gameover') { renderGoTrophies(); updateTrophyDot(); return; }   // the card shows it instead
+    var thisRun = runTrophies;
+    setTimeout(function () {
+      if (state !== 'playing' || thisRun !== runTrophies) return;   // that run is over
+      showToast('\uD83C\uDFC6 ' + d.name + '! +' + d.reward + ' \uD83E\uDE99', '#f0a500');
+      GameAudio.missionDone();
+      vibrate(40);
+    }, wait);
+    updateTrophyDot();
+  }
+
+  // the "new trophy" line on the game-over card
+  function renderGoTrophies() {
+    if (!runTrophies.length) { el.goTrophies.classList.add('hidden'); return; }
+    el.goTrophies.innerHTML = '\uD83C\uDFC6 ' + (runTrophies.length === 1 ? 'New trophy: ' : 'New trophies: ') +
+      runTrophies.slice(0, 2).map(function (t) { return t.icon + ' ' + t.name; }).join(', ') +
+      (runTrophies.length > 2 ? ' +' + (runTrophies.length - 2) + ' more' : '');
+    el.goTrophies.classList.remove('hidden');
+  }
+
+  function updateTrophyDot() {
+    el.trophyDot.classList.toggle('hidden', !Achievements.hasNew());
+  }
+
+  function renderTrophies() {
+    var list = Achievements.view(), c = Achievements.counts();
+    el.trophyCount.textContent = c.done + ' / ' + c.total;
+    el.trophyBar.style.width = Math.round(100 * c.done / c.total) + '%';
+    function row(t) {
+      var pct = Math.round(100 * t.progress / t.target);
+      return '<div class="trow ' + (t.done ? 'done' : 'locked') + (t.isNew ? ' fresh' : '') + '">' +
+        '<span class="ti">' + t.icon + '</span><div class="tt"><div class="tn">' + t.name + '</div><div class="td">' + t.desc + '</div>' +
+        (t.done ? '' : '<div class="tp"><div class="mbar"><i style="width:' + pct + '%"></i></div></div>') + '</div>' +
+        '<span class="tr">' + (t.done ? '\u2713 +' + t.reward : t.progress + ' / ' + t.target) + '</span></div>';
+    }
+    var todo = list.filter(function (t) { return !t.done; }).sort(function (a, b) { return b.progress / b.target - a.progress / a.target; });
+    var done = list.filter(function (t) { return t.done; });
+    var html = '';
+    if (todo.length) html += '<div class="sec-title">IN PROGRESS</div>' + todo.map(row).join('');
+    if (done.length) html += '<div class="sec-title">UNLOCKED</div>' + done.map(row).join('');
+    el.trophiesBody.innerHTML = html;
+    Achievements.markSeen();
+    updateTrophyDot();
+  }
+
   function onMissionComplete(info) {
-    if (GameAudio) GameAudio.missionDone();
+    GameAudio.missionDone();
     vibrate(40);
     if (info.kind === 'daily') {
+      Achievements.event('daily', 1);
+      Achievements.event('streak', info.streak, true);
       showToast('🏅 DAILY DONE! +' + info.reward + ' 🪙  🔥' + info.streak, '#ff8a1f');
     } else {
       showToast(info.icon + ' MISSION! +' + info.reward + ' 🪙', '#3d8bff');
@@ -1013,10 +1122,10 @@
 
   function addCoins(base) {
     var value = base * (powers.double ? 2 : 1);
-    runCoins += value;
     runStats.coins += value;
     setCoins(totalCoins + value);
     Missions.event('coins', value);
+    Achievements.event('coins', value);
     var box = el.coins.parentNode;
     box.classList.remove('pop');
     void box.offsetWidth;
@@ -1024,7 +1133,7 @@
   }
 
   function onMagnetCoin() {
-    if (GameAudio) GameAudio.coin();
+    GameAudio.coin();
     Particles.sparkle(player.x, player.y + 0.6, player.z);
     addCoins(1);
   }
@@ -1038,8 +1147,54 @@
     lastComboCount = -1;
   }
 
+  // ---- rare events: thunderstorm / solar flare, and coin rain -----------------------
+  var evt = { cooldown: 40, strikesLeft: 0, strikeT: 0 };
+
+  function maybeEvent(z) {
+    if (z < 25 || evt.strikesLeft > 0) return;
+    if (--evt.cooldown > 0 || Math.random() > 0.07) return;
+    evt.cooldown = 45 + Utils.randInt(0, 25);
+    if (Math.random() < 0.5) {
+      Achievements.event('events', 1);
+      var st = Biome.theme(curBiome).storm;
+      showToast(st ? st.toast : '\u26A1 THUNDERSTORM!', '#7f9dff');
+      evt.strikesLeft = 3; evt.strikeT = 0.9;
+    } else {
+      var n = world.coinRain(Math.round(player.z));
+      if (n) {
+        Achievements.event('events', 1);
+        showToast('\uD83E\uDE99 COIN RAIN!', '#ffc107');
+        GameAudio.coinRain();
+      }
+    }
+  }
+
+  function updateEvents(dt) {
+    if (evt.strikesLeft <= 0 || state !== 'playing' || player.dying) return;
+    evt.strikeT -= dt;
+    if (evt.strikeT > 0) return;
+    evt.strikesLeft--;
+    evt.strikeT = Utils.randRange(0.9, 1.7);
+    var st = Biome.theme(curBiome).storm;
+    Weather.strike(st && st.color);
+    if (st && st.sound) st.sound(); else GameAudio.thunder(0.12);
+    shakeT = Math.max(shakeT, 0.12);
+  }
+
+  function onWorldEvent(kind) {
+    if (kind === 'stampede') {
+      showToast('\uD83E\uDD94 STAMPEDE AHEAD!', '#ff8a1f');
+      GameAudio.stampede();
+      Achievements.event('events', 1);
+    }
+  }
+
   // A new row was reached.
+  var runBiome = null;                 // the world of the furthest row reached this run
+
   function onNewRow(z) {
+    maybeEvent(z);
+    if (eagleCried) Achievements.event('eagleEscape', 1);   // moved on after hearing the warning
     idleTimer = 0;
     eagleCried = false;
 
@@ -1047,12 +1202,13 @@
     combo.timer = COMBO_WINDOW;
     var mult = Math.min(5, 1 + Math.floor((combo.count - 1) / 5));
     if (mult > combo.mult) {
-      if (GameAudio) GameAudio.comboUp(mult);
+      GameAudio.comboUp(mult);
       popText('x' + mult + ' COMBO!', COMBO_COLORS[mult - 1]);
       el.combo.classList.remove('pop');
       void el.combo.offsetWidth;
       el.combo.classList.add('pop');
       Missions.event('combo', mult, true);
+      Achievements.event('combo', mult, true);
     }
     combo.mult = mult;
     runStats.maxMult = Math.max(runStats.maxMult, mult);
@@ -1065,6 +1221,27 @@
     if (row && row.type === CONFIG.ROW_TYPES.ROAD) Missions.event('roads', 1);
     else if (row && row.type === CONFIG.ROW_TYPES.WATER) Missions.event('rivers', 1);
     Missions.event('rows', z, true);
+    Achievements.event('rows', z, true);
+    Achievements.event('rows_' + Difficulty.mode, z, true);
+    if (row) {
+      if (row.bikes) Achievements.event('bikes', 1);
+      if (row.stampede) Achievements.event('stampedes', 1);
+      if (row.crumbly) Achievements.event('crumbles', 1);
+      if (row.dual) Achievements.event('dualRails', 1);
+      if (row.type === CONFIG.ROW_TYPES.ROAD) Achievements.event('roads', 1);
+      else if (row.type === CONFIG.ROW_TYPES.WATER) {
+        Achievements.event('rivers', 1);
+        if (row.void) Achievements.event('voids', 1);
+        else if (row.logs.some(function (l) { return l.croc; })) Achievements.event('crocs', 1);
+      } else if (row.type === CONFIG.ROW_TYPES.RAIL) Achievements.event('rails', 1);
+      else if (row.ice) Achievements.event('ice', 1);
+      if (row.biome !== runBiome) {                       // the frontier crossed into another world
+        if (runBiome) Achievements.event('swaps', 1);
+        runBiome = row.biome;
+      }
+      var biomeStat = Biome.theme(row.biome).stat;   // a theme may count "reached this world" as a trophy stat
+      if (biomeStat) Achievements.event(biomeStat, 1, true);
+    }
   }
 
   function onNearMiss() {
@@ -1074,10 +1251,12 @@
     showScore();
     runStats.near++;
     if (combo.count > 0) combo.timer = Math.max(combo.timer, COMBO_WINDOW * 1.5); // a close call keeps the streak alive
-    if (GameAudio) GameAudio.nearMiss();
+    GameAudio.nearMiss();
     vibrate(15);
     popText('CLOSE CALL! +' + pts, '#ffd23f');
     Missions.event('near', 1);
+    Achievements.event('near', 1);
+    Achievements.event('nearAll', 1);
   }
 
   function updateComboHud(dt) {
@@ -1102,13 +1281,15 @@
 
   function onItemCollected(type, x, y, z) {
     Missions.event('powerups', 1);
+    Achievements.event('powerups', 1);
+    Achievements.mark('powerKinds', type);
     activatePower(type, x, y, z);
   }
 
   function activatePower(type, x, y, z) {
     var def = CONFIG.POWERUPS[type];
     if (x === undefined) { x = player.x; y = player.y; z = player.z; }
-    if (GameAudio) GameAudio.powerup();
+    GameAudio.powerup();
     vibrate(25);
     Particles.burst(x, y + 0.8, z, { colors: [hexNum(def.color), 0xffffff, 0xfff3b0], count: 18, speed: 3.6, up: 5, size: 0.12, life: 0.8, gravity: 6, spread: 0.2 });
     Particles.ring(x, y + 0.05, z, hexNum(def.color), 3.2);
@@ -1132,7 +1313,7 @@
     else if (type === 'freeze') {
       world.frozen = true;
       el.freezeFx.classList.add('on');
-      if (GameAudio) GameAudio.freeze();
+      GameAudio.freeze();
     } else if (type === 'jump' || type === 'skiplane') refreshJump();
   }
 
@@ -1182,7 +1363,7 @@
   function doBlast() {
     var z = Math.round(player.z);
     var n = world.blast(player.x, z, 8);
-    if (GameAudio) GameAudio.blast();
+    GameAudio.blast();
     vibrate(80);
     shakeT = 0.5;
     Particles.ring(player.x, player.y + 0.1, player.z, 0xffa530, 7);
@@ -1197,7 +1378,7 @@
 
   // ---- game flow ----------------------------------------------------------
   function onPlayerDeath(type) {
-    lastDeath = type;
+    Achievements.mark('deathKinds', type);
     if (type === 'car' || type === 'train') { shakeT = 0.32; vibrate(70); }
     else if (type === 'drown' || type === 'fall') { shakeT = 0.12; vibrate(40); }
     else if (type === 'croc') { shakeT = 0.25; vibrate(60); }
@@ -1205,12 +1386,6 @@
     resetCombo();
     Music.duck(0.2, 2.2);
   }
-
-  var CAUSES = {
-    car: 'Squashed by traffic!', train: 'Choo-choo! Hit by a train!',
-    drown: 'Splash! Took a swim…', eagle: 'Snatched by the eagle!',
-    croc: 'Chomp! Eaten by a crocodile!', fall: 'Fell into the void!'
-  };
 
   function animateNumber(node, to, ms) {
     if (to <= 0) { node.textContent = '0'; return; }
@@ -1239,24 +1414,29 @@
 
   function triggerGameOver() {
     state = 'gameover';
+    gameOverAt = performance.now();
     document.body.classList.remove('in-run');
     clearPowers();
     Missions.runEnd();
+    Achievements.runEnd();
     var isBest = score > bestScore;
     if (isBest) {
       bestScore = score;
-      try { localStorage.setItem(bestKey(), String(bestScore)); } catch (e) { /* private mode */ }
+      lsSet(bestKey(), String(bestScore));
     }
     var record = isBest && score > 0;
     refreshBests();
     el.goCoins.textContent = runStats.coins;
     el.goCombo.textContent = 'x' + runStats.maxMult;
     el.goNear.textContent = runStats.near;
+    renderGoTrophies();
+    updateTrophyDot();
     el.goTitle.textContent = record ? '🏆 NEW TOP SCORE!' : 'GAME OVER';
     el.gameOverPanel.classList.toggle('is-record', record);
     refreshHud();
     el.score.textContent = score;
-    if (GameAudio) GameAudio.gameOver();
+    el.finalScore.textContent = score;
+    GameAudio.gameOver();
     setTimeout(function () {
       if (state !== 'gameover') return;
       if (settingsOpen) { panelHiddenForModal = el.gameOverPanel; return; }
@@ -1419,7 +1599,7 @@
       var chips = [
         Difficulty.cur.icon + ' ' + Difficulty.cur.label.toUpperCase(),
         '🏆 TOP ' + bestScore,
-        '🪙 ' + runCoins
+        '🪙 ' + runStats.coins
       ];
       var chipFont = 40, widths, gap = 22, sumW;
       do {
@@ -1452,10 +1632,13 @@
 
   function openShare() {
     if (state !== 'gameover' || !player) return;
+    var mine = ++shareReq;
     var snap = snapshotScene();
     buildShareCard(snap).then(function (cv) {
+      if (mine !== shareReq || state !== 'gameover') return;
       cv.toBlob(function (blob) {
-        if (!blob) return;
+        if (!blob || mine !== shareReq || state !== 'gameover') return;
+        Achievements.event('shares', 1);
         shareBlob = blob;
         if (shareUrl) URL.revokeObjectURL(shareUrl);
         shareUrl = URL.createObjectURL(blob);
@@ -1464,16 +1647,15 @@
         el.shareCopyBtn.classList.toggle('hidden', !(navigator.clipboard && (window.ClipboardItem || navigator.clipboard.writeText)));
         openModal(el.sharePanel);
       }, 'image/png');
-    });
+    }).catch(function () { /* the card could not be drawn: stay on the game-over screen */ });
   }
-
-  function closeShare() { closeModal(); }
 
   function flashLabel(btn, text) {
     var label = btn.querySelector('span:last-child');
-    var old = label.textContent;
+    if (!label.hasAttribute('data-orig')) label.setAttribute('data-orig', label.textContent);
     label.textContent = text;
-    setTimeout(function () { label.textContent = old; }, 1600);
+    clearTimeout(btn._flashT);
+    btn._flashT = setTimeout(function () { label.textContent = label.getAttribute('data-orig'); }, 1600);
   }
 
   function shareNative() {
@@ -1502,10 +1684,10 @@
     var done = function () { flashLabel(el.shareCopyBtn, 'COPIED!'); };
     if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
       navigator.clipboard.write([new ClipboardItem({ 'image/png': shareBlob })]).then(done, function () {
-        navigator.clipboard.writeText(shareText()).then(done);
+        navigator.clipboard.writeText(shareText()).then(done, function () { /* clipboard denied */ });
       });
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(shareText() + (location.protocol.indexOf('http') === 0 ? ' ' + location.href : '')).then(done);
+      navigator.clipboard.writeText(shareText() + (location.protocol.indexOf('http') === 0 ? ' ' + location.href : '')).then(done, function () { /* clipboard denied */ });
     }
   }
 
@@ -1515,11 +1697,12 @@
     autoStart = autoStart === true;
     state = 'start';
     document.body.classList.remove('in-run');
-    runCoins = 0;
     score = 0;
     runStats = { coins: 0, near: 0, maxMult: 1, maxCombo: 0 };
     resetCombo();
-    lastDeath = null;
+    evt.cooldown = 40; evt.strikesLeft = 0; evt.strikeT = 0;
+    runBiome = null;
+    shareReq++;                       // a share card still being built is for the old run
     lastRow = 0;
     idleTimer = 0;
     eagleCried = false;
@@ -1539,6 +1722,8 @@
       document.body.classList.add('in-run');
       el.startPanel.classList.add('hidden');
       Missions.runStart();
+      Achievements.runStart();
+      runTrophies = [];
       camX = 0;
       camZ = CONFIG.CAMERA_LEAD;
     } else {
@@ -1551,9 +1736,9 @@
     updateCamera(0, true);
   }
 
-  // Standing still is the only thing that summons the eagle. There is no on-screen
-  // alert: its screech plays 3 seconds before it arrives (the total wait depends
-  // on the difficulty: Easy 12 s, Medium 9 s, Hard 7.5 s, Extreme 6 s).
+  // Not reaching a new row for a while summons the eagle (hopping sideways or back does
+  // not count). There is no on-screen alert: its screech plays 3 seconds before it
+  // arrives (the wait depends on the difficulty: Easy 12 s ... Extreme 6 s; Zen has no eagle).
   function checkIdle() {
     if (state !== 'playing' || !player.alive || player.dying) return;
     var wait = Difficulty.cur.eagle;
@@ -1575,14 +1760,14 @@
     Weather.update(dt, player.maxZ, camX, camZ, currentLevel());
     var quiet = state !== 'playing' || player.dying;
     var amb = world.amb;
-    if (GameAudio) GameAudio.setAmbience(quiet ? 0 : amb.traffic, quiet ? 0 : Weather.rain);
+    GameAudio.setAmbience(quiet ? 0 : amb.traffic, quiet ? 0 : Weather.rain);
     syncBiome(false);
-    var biomeTheme = Biome.theme(curBiome);
-    if (biomeTheme.update) biomeTheme.update(dt, world.time);   // a theme may animate itself (e.g. neon pulse)
     var n = Weather.night;
     var tm = Weather.themeMix, tname = Weather.themeName;
     var themeMood = tm > 0.5 && tname ? Biome.theme(tname).musicMood : null;
-    Music.setMood(themeMood || (n > 0.6 ? 'night' : n < 0.4 ? 'day' : null));
+    // (leaving a themed world must hand the music back, even in the dusk band where the day/night mood has hysteresis)
+    Music.setMood(themeMood || (n > 0.6 ? 'night' : n < 0.4 ? 'day' : (wasThemeMood ? (n >= 0.5 ? 'night' : 'day') : null)));
+    wasThemeMood = !!themeMood;
     if (tm !== bdMix) {
       bdMix = tm;
       backdrop.material.color.setHex(CONFIG.COLORS.grassB);
@@ -1595,6 +1780,7 @@
     if (state === 'playing' && !player.dying) idleTimer += dt;
     player.update(dt, world);
     updatePowers(dt);
+    updateEvents(dt);
     Particles.update(dt);
     updateCamera(dt);
 

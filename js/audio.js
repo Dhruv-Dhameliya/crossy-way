@@ -1,6 +1,7 @@
-// Sound effects and ambience via WebAudio. The eagle cry, train horn and crossing
-// bell are real recordings (js/sounds.js); everything else is synthesized, and
-// any recording that is missing falls back to a synthesized stand-in.
+// Sound effects and ambience via WebAudio. The eagle cry, train horn, crossing bell,
+// car horn, siren, splash and hen squawk are real recordings (js/sounds.js); everything
+// else is synthesized, and any recording that is missing falls back to a synthesized
+// stand-in. Nothing plays until the first tap/key creates the audio context.
 // Most world sounds take a `vol` (0..1) so they fade with distance from the chicken.
 var GameAudio = (function () {
   var ctx = null;
@@ -33,7 +34,7 @@ var GameAudio = (function () {
   // Play a recording. Returns false when it is not available (caller falls back
   // to the synthesized version). opts: gain, rate, offset, dur (seconds), delay.
   function sample(name, vol, opts) {
-    var c = ensureCtx();
+    var c = live();
     if (!c || !buffers[name]) return false;
     if (!enabled) return true;
     opts = opts || {};
@@ -72,6 +73,14 @@ var GameAudio = (function () {
     return ctx;
   }
 
+  // The context only exists after the first user gesture (unlock); until it is running,
+  // sounds are simply skipped so they don't pile up and burst out together.
+  function live() {
+    if (!ctx) return null;
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx.state === 'running' ? ctx : null;
+  }
+
   function getNoise() {
     if (!noiseBuf && ctx) {
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -83,7 +92,7 @@ var GameAudio = (function () {
 
   function tone(freq, duration, type, gainStart, opts) {
     if (!enabled) return;
-    var c = ensureCtx();
+    var c = live();
     if (!c) return;
     opts = opts || {};
     var vol = opts.vol === undefined ? 1 : opts.vol;
@@ -119,7 +128,7 @@ var GameAudio = (function () {
 
   function noise(duration, gainStart, opts) {
     if (!enabled) return;
-    var c = ensureCtx();
+    var c = live();
     if (!c) return;
     opts = opts || {};
     var vol = opts.vol === undefined ? 1 : opts.vol;
@@ -171,6 +180,7 @@ var GameAudio = (function () {
   }
 
   var hopStep = 0;
+  var ambKey = '';
 
   return {
     setEnabled: function (v) {
@@ -179,17 +189,20 @@ var GameAudio = (function () {
     },
     isEnabled: function () { return enabled; },
     unlock: function () { ensureCtx(); },
-    sample: sample,
+    sample: sample,   // (also used by the automated checks)
     // the synth building blocks, for themes (e.g. js/space/) that bring their own sounds
     kit: { tone: tone, noise: noise },
 
     // traffic: 1 while the chicken's lane (or the next) is a road; rain: weather intensity 0..1
     setAmbience: function (traffic, rain) {
       if (!ctx) return;
+      var on = enabled ? 1 : 0;
+      var key = Math.round(traffic * 100) + ':' + Math.round((rain || 0) * 100) + ':' + on;
+      if (key === ambKey) return;            // nothing changed: don't schedule more automation
       var a = ensureAmb();
       if (!a) return;
+      ambKey = key;
       var t = ctx.currentTime;
-      var on = enabled ? 1 : 0;
       a.traffic.gain.setTargetAtTime(traffic * 0.16 * on, t, 0.4);
       var r = rain || 0;
       a.rainA.gain.setTargetAtTime(r * 0.045 * on, t, 0.6);
@@ -214,6 +227,7 @@ var GameAudio = (function () {
 
     // ---- deaths ----
     squish: function () {
+      sample('hen', 1, { gain: 0.55, rate: 1.25 });   // a startled squawk
       tone(180, 0.28, 'sawtooth', 0.12, { freqEnd: 40 });
       noise(0.22, 0.2, { freq: 900, freqEnd: 150 });
     },
@@ -222,6 +236,7 @@ var GameAudio = (function () {
       tone(110, 0.4, 'sawtooth', 0.16, { freqEnd: 35 });
     },
     splash: function () {
+      if (sample('splash', 1, { gain: 0.9 })) return;
       noise(0.5, 0.22, { filter: 'bandpass', freq: 1800, freqEnd: 500, q: 0.7, attack: 0.03 });
       tone(330, 0.25, 'sine', 0.08, { freqEnd: 90 });
     },
@@ -260,7 +275,6 @@ var GameAudio = (function () {
     },
     // The train thundering past: rumble plus rhythmic chugging.
     trainPass: function (vol) {
-      if (sample('pass', vol, { gain: 0.8 })) return;
       noise(2.4, 0.3, { vol: vol, freq: 260, freqEnd: 140, attack: 0.5 });
       for (var i = 0; i < 12; i++) {
         noise(0.12, 0.2, { vol: vol, freq: 700, freqEnd: 250, delay: 0.1 + i * 0.17 });
@@ -269,6 +283,16 @@ var GameAudio = (function () {
 
     // ---- traffic ----
     carHorn: function (vol, big) {
+      if (buffers.carhorn) {
+        // the real horn: a deep blast for trucks and buses, a quick "beep beep" for cars
+        if (big) sample('carhorn', vol, { gain: 0.9, rate: 0.62 });
+        else {
+          var r = 0.95 + Math.random() * 0.25;
+          sample('carhorn', vol, { gain: 0.75, rate: r });
+          sample('carhorn', vol, { gain: 0.75, rate: r, delay: 0.36 });
+        }
+        return;
+      }
       if (big) {
         // truck / bus air horn
         tone(185, 0.75, 'sawtooth', 0.07, { vol: vol, attack: 0.03, hold: 0.5 });
@@ -363,8 +387,31 @@ var GameAudio = (function () {
     },
     // the chicken's startled squawk as the talons close
     squawk: function () {
+      if (sample('hen', 1, { gain: 0.95 })) return;
       tone(900, 0.16, 'square', 0.07, { freqEnd: 1500, vibrato: 30 });
       tone(1250, 0.14, 'triangle', 0.05, { freqEnd: 700, delay: 0.1 });
+    },
+    // ---- rare events and new hazards ----
+    bikeBell: function (vol) {
+      if (sample('bell', vol, { gain: 0.5, rate: 1.7, dur: 0.3 })) return;
+      tone(1700, 0.2, 'sine', 0.06, { vol: vol });
+    },
+    stomp: function (vol) {
+      for (var i = 0; i < 4; i++) {
+        noise(0.12, 0.28, { vol: vol, freq: 220, freqEnd: 70, delay: i * 0.12 });
+        tone(65, 0.12, 'sine', 0.12, { vol: vol, delay: i * 0.12 });
+      }
+    },
+    stampede: function () {
+      noise(2.4, 0.3, { freq: 200, freqEnd: 80, attack: 0.5 });
+      for (var i = 0; i < 12; i++) noise(0.1, 0.22, { freq: 240, freqEnd: 70, delay: 0.1 + i * 0.16 });
+    },
+    crack: function (vol) {
+      noise(0.2, 0.3, { vol: vol, freq: 3200, freqEnd: 500, attack: 0.002 });
+      tone(150, 0.14, 'square', 0.08, { vol: vol, freqEnd: 70 });
+    },
+    coinRain: function () {
+      [988, 1175, 1319, 1568, 1760, 2093].forEach(function (f, i) { tone(f, 0.22, 'sine', 0.06, { delay: i * 0.07 }); });
     },
     // new hazards
     slide: function () {
@@ -403,6 +450,7 @@ var GameAudio = (function () {
 
     // Signature sounds of the special vehicles
     siren: function (vol) {
+      if (sample('siren', vol, { gain: 0.8 })) return;
       [0, 0.45].forEach(function (d) {
         tone(650, 0.42, 'square', 0.04, { vol: vol, freqEnd: 1100, delay: d, attack: 0.04 });
         tone(1300, 0.42, 'sine', 0.025, { vol: vol, freqEnd: 2200, delay: d, attack: 0.04 });

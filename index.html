@@ -48,7 +48,7 @@
   </div>
 
   <div id="pops"></div>
-  <div id="toast"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
 
   <!-- in-run pause button (the welcome / game-over screens have their own menu buttons) -->
   <div class="corner-buttons">
@@ -74,15 +74,27 @@
     </div>
 
     <button id="playBtn" class="play-btn"><span class="play-ico">▶</span> PLAY</button>
-    <div class="menu-row">
-      <button id="startShopBtn" class="menu-btn shop"><span class="mi">🛍️</span> SHOP</button>
-      <button id="startMissionsBtn" class="menu-btn missions"><span class="mi">🎯</span> MISSIONS<i id="missionDot" class="dot"></i></button>
-    </div>
-    <div class="menu-row icons">
-      <button id="infoBtn" class="menu-btn info icon" title="How to play" aria-label="How to play">ℹ️</button>
-      <button id="modeBtn" class="menu-btn mode" data-mode="medium" title="Change difficulty">⚡ MEDIUM</button>
-      <button id="settingsBtn" class="menu-btn settings icon" title="Settings (Esc)" aria-label="Settings">⚙️</button>
-      <button id="fullscreenBtn" class="menu-btn full icon" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+
+    <div class="home-menu">
+      <div class="stage-pick" role="group" aria-label="Stage">
+        <span class="stage-label">STAGE</span>
+        <div class="stage-row">
+          <button class="stage-btn biome-btn" data-biome="auto" title="Forest, then Space, then back"><span class="si">🔄</span><span class="sl">Auto</span></button>
+          <button class="stage-btn biome-btn" data-biome="forest"><span class="si">🌲</span><span class="sl">Forest</span></button>
+          <button class="stage-btn biome-btn" data-biome="space"><span class="si">🚀</span><span class="sl">Space</span></button>
+        </div>
+      </div>
+      <div class="home-grid">
+        <button id="startShopBtn" class="menu-btn shop"><span class="mi">🛍️</span> SHOP</button>
+        <button id="startMissionsBtn" class="menu-btn missions"><span class="mi">🎯</span> MISSIONS<i id="missionDot" class="dot"></i></button>
+        <button id="startTrophiesBtn" class="menu-btn trophies"><span class="mi">🏆</span> TROPHIES<i id="trophyDot" class="dot hidden"></i></button>
+        <button id="modeBtn" class="menu-btn mode" data-mode="medium" title="Change difficulty">⚡ MEDIUM</button>
+      </div>
+      <div class="home-bar">
+        <button id="infoBtn" class="menu-btn info icon" title="How to play" aria-label="How to play">ℹ️</button>
+        <button id="settingsBtn" class="menu-btn settings icon" title="Settings (Esc)" aria-label="Settings">⚙️</button>
+        <button id="fullscreenBtn" class="menu-btn full icon" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+      </div>
     </div>
     <p id="startHint" class="hint">or tap anywhere · press an arrow key</p>
   </div>
@@ -102,16 +114,19 @@
         <div class="stat s-top"><span>🔥</span><b id="goCombo">x1</b><small>COMBO</small></div>
         <div class="stat s-near"><span>😰</span><b id="goNear">0</b><small>CLOSE</small></div>
       </div>
-      <div class="go-row">
-        <button id="shareBtn" class="share-btn"><span class="gi">⤴</span><span>SHARE</span></button>
+      <div id="goTrophies" class="go-trophies hidden"></div>
+      <div class="go-actions">
         <button id="restartBtn"><span class="gi">▶</span><span>PLAY AGAIN</span></button>
-        <button id="homeBtn" class="home-btn"><span class="gi">🏠</span><span>HOME</span></button>
+        <div class="go-sub">
+          <button id="shareBtn" class="share-btn"><span class="gi">⤴</span><span>SHARE</span></button>
+          <button id="homeBtn" class="home-btn"><span class="gi">🏠</span><span>HOME</span></button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- ===== SHARE CARD ===== -->
-  <div id="sharePanel" class="panel modal hidden">
+  <div id="sharePanel" class="panel modal hidden" role="dialog" aria-modal="true">
     <div class="set-card share-card">
       <h2>SHARE YOUR SCORE</h2>
       <img id="shareImg" class="share-img" alt="Your Crossy Way score card" />
@@ -125,7 +140,7 @@
   </div>
 
   <!-- ===== SHOP ===== -->
-  <div id="shopPanel" class="panel modal hidden">
+  <div id="shopPanel" class="panel modal hidden" role="dialog" aria-modal="true">
     <div class="set-card shop-card">
       <div class="card-head">
         <h2>SHOP</h2>
@@ -138,15 +153,18 @@
       <div class="tabs">
         <button class="tab shop-tab active" data-tab="skin">🐔 Chickens</button>
         <button class="tab shop-tab" data-tab="outfit">🎩 Outfits</button>
+        <button class="tab shop-tab" data-tab="fx">✨ Effects</button>
       </div>
+      <button id="chestBtn" class="chest-btn"><span class="chest-ico">🎁</span><span class="chest-txt"><b>MYSTERY CHEST</b><small>A random new item</small></span><span class="chest-price">🪙 90</span></button>
       <div id="shopGrid" class="shop-grid"></div>
+      <div id="chestReveal" class="chest-reveal hidden" aria-live="polite"></div>
       <p id="shopHint" class="shop-hint">Tap an item to buy or wear it.</p>
       <button id="closeShopBtn" class="close-btn">◀ BACK</button>
     </div>
   </div>
 
   <!-- ===== MISSIONS ===== -->
-  <div id="missionsPanel" class="panel modal hidden">
+  <div id="missionsPanel" class="panel modal hidden" role="dialog" aria-modal="true">
     <div class="set-card mission-card">
       <h2>MISSIONS</h2>
       <div id="missionsBody"></div>
@@ -154,8 +172,18 @@
     </div>
   </div>
 
+  <!-- ===== TROPHIES ===== -->
+  <div id="trophiesPanel" class="panel modal hidden" role="dialog" aria-modal="true">
+    <div class="set-card trophy-card">
+      <h2>TROPHIES</h2>
+      <div class="trophy-head"><b id="trophyCount">0 / 0</b><div class="mbar"><i id="trophyBar" style="width:0%"></i></div></div>
+      <div id="trophiesBody"></div>
+      <button id="closeTrophiesBtn" class="close-btn">◀ BACK</button>
+    </div>
+  </div>
+
   <!-- ===== INFO ===== -->
-  <div id="infoPanel" class="panel modal hidden">
+  <div id="infoPanel" class="panel modal hidden" role="dialog" aria-modal="true">
     <div class="set-card info-card">
       <h2>HOW TO PLAY</h2>
       <div class="sec-title">THE BASICS</div>
@@ -182,8 +210,14 @@
         <li>🐢 <b>Turtles</b> shake, then dive. Hop off before they go under!</li>
         <li>🐊 <b>Crocodile logs:</b> the back is safe, but the head snaps shut. Stay away when the mouth opens!</li>
         <li>🧊 <b>Ice:</b> you keep sliding a little after you land. Plan your next hop.</li>
+        <li>🚲 <b>Bike lanes:</b> small, fast bicycles (hover scooters in Space) come in streams. Listen for their bells.</li>
+        <li>🚆 <b>Double tracks:</b> two railways can fire at once from opposite directions.</li>
+        <li>🪵 <b>Rotten logs:</b> they shake, then sink. Keep moving!</li>
+        <li>🦬 <b>Stampede:</b> a rare lane of running animals. You get a rumble and a warning first.</li>
+        <li>⚡ <b>Rare events:</b> thunderstorms (solar flares in Space) and coin rain. Grab the coins!</li>
+        <li>🧘 <b>Zen mode:</b> no eagle, no timer, lots of coins. Pick it as your difficulty.</li>
         <li>🪨 <b>Chasms:</b> only moving platforms cross them. Time your hop, don't fall in.</li>
-        <li>🚀 <b>Space:</b> run far enough and the world turns into a neon space. Ships fly over light-bridges, rivers are empty space crossed on broken asteroids, comets replace trains (watch the beacons!), laser strikes replace crocodiles and a UFO replaces the eagle. Pick a biome in Settings → World.</li>
+        <li>🚀 <b>Space:</b> run far enough and the world turns into space. Ships fly past steel walkways, rivers are empty space crossed on broken asteroids, comets replace trains (watch the beacons!), laser strikes replace crocodiles and a UFO replaces the eagle. Choose the stage on the home screen.</li>
         <li>🦅 <b>The eagle:</b> if you stand still you'll hear it screech. 3 seconds later it grabs you.</li>
         <li>🚑 Special vehicles: ambulances, ice-cream trucks, tractors, motorbikes and fast sports cars.</li>
         <li>🌲 Hay bales, fences, scarecrows, barrels and more block your way.</li>
@@ -193,11 +227,11 @@
   </div>
 
   <!-- ===== SETTINGS ===== -->
-  <div id="settingsPanel" class="panel modal settings-panel hidden">
+  <div id="settingsPanel" class="panel modal settings-panel hidden" role="dialog" aria-modal="true">
     <div class="set-card">
       <h2>PAUSED</h2>
 
-      <div class="set-tabs" role="tablist">
+      <div class="set-tabs">
         <button class="set-tab active" data-sec="game"><span class="ti">⚡</span><span class="tl">Game</span></button>
         <button class="set-tab" data-sec="controls"><span class="ti">🎮</span><span class="tl">Controls</span></button>
         <button class="set-tab" data-sec="world"><span class="ti">🌦️</span><span class="tl">World</span></button>
@@ -210,10 +244,11 @@
         <div class="setting-group">
           <div class="setting-label">Difficulty</div>
           <div class="option-row diff-row">
-            <button class="option-btn diff-btn" data-diff="easy"><span>🌱 Easy</span><small class="diff-best" data-best="easy">TOP 0</small></button>
-            <button class="option-btn diff-btn" data-diff="medium"><span>⚡ Medium</span><small class="diff-best" data-best="medium">TOP 0</small></button>
-            <button class="option-btn diff-btn" data-diff="hard"><span>🔥 Hard</span><small class="diff-best" data-best="hard">TOP 0</small></button>
-            <button class="option-btn diff-btn" data-diff="extreme"><span>💀 Extreme</span><small class="diff-best" data-best="extreme">TOP 0</small></button>
+            <button class="option-btn diff-btn" data-diff="zen"><span>🧘 Zen</span><small class="diff-best">TOP 0</small></button>
+            <button class="option-btn diff-btn" data-diff="easy"><span>🌱 Easy</span><small class="diff-best">TOP 0</small></button>
+            <button class="option-btn diff-btn" data-diff="medium"><span>⚡ Medium</span><small class="diff-best">TOP 0</small></button>
+            <button class="option-btn diff-btn" data-diff="hard"><span>🔥 Hard</span><small class="diff-best">TOP 0</small></button>
+            <button class="option-btn diff-btn" data-diff="extreme"><span>💀 Extreme</span><small class="diff-best">TOP 0</small></button>
           </div>
           <p id="diffNote" class="setting-note"></p>
           <p class="setting-note">Each difficulty keeps its own top score. Harder modes mean faster traffic, busier roads, more trains and a quicker eagle.</p>
@@ -280,15 +315,6 @@
           </div>
           <p class="setting-note">Auto changes the time of day and the weather as you run. In Space, rain becomes a meteor shower.</p>
         </div>
-        <div class="setting-group">
-          <div class="setting-label">Biome</div>
-          <div class="option-row">
-            <button class="option-btn biome-btn" data-biome="auto">🔄 Auto</button>
-            <button class="option-btn biome-btn" data-biome="forest">🌲 Forest</button>
-            <button class="option-btn biome-btn" data-biome="space">🚀 Space</button>
-          </div>
-          <p class="setting-note">Same game, new look. Auto flies from the Forest into Space and back as you run; the other two lock one world in.</p>
-        </div>
       </div>
 
       <!-- AUDIO -->
@@ -353,6 +379,7 @@
   <script src="js/audio.js"></script>
   <script src="js/cosmetics.js"></script>
   <script src="js/missions.js"></script>
+  <script src="js/achievements.js"></script>
   <script src="js/music.js"></script>
   <script src="js/weather.js"></script>
   <script src="js/textures.js"></script>

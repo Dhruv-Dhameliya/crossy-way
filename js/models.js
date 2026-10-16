@@ -1,4 +1,4 @@
-// Every 3D asset in the game (the one and only Crossy Way world): trees,
+// Every 3D asset of the Forest (and the hooks other biomes plug into): trees,
 // rocks, vehicles, logs, lily pads, trains, signals, the coin and the eagle.
 // Static scenery is returned as box lists so a whole grass row can be baked
 // into one mesh; moving things come back as ready-to-use meshes.
@@ -29,7 +29,7 @@ var Models = (function () {
   }
 
   // Other biomes register their props here (see js/space/): same kinds, new looks.
-  // A biome may define: obstacles, border, flower, rock, bush, vehicles, vehicleColors,
+  // A biome may define: obstacles, border, flower, rock, vehicles, vehicleColors,
   // logBoxes, pad, turtleBoxes, locoBoxes, carBoxes, carColors, croc, platform, gate,
   // signalStyle, material (used for its moving props), warm().
   var BIOMES = {};
@@ -156,11 +156,56 @@ var Models = (function () {
     out.push(B(x + 0.22, 0.23, z - 0.22, 0.22, 0.08, 0.22, 0xe53935));
   }
 
+
+  // ---- more blockers (a few new decorative props) ----
+  function wellBoxes(out, x, z) {           // tall
+    out.push(B(x, 0.2, z, 0.7, 0.4, 0.7, 0x9a9ea6));
+    out.push(B(x, 0.41, z, 0.46, 0.02, 0.46, 0x3f8fd6));
+    out.push(B(x - 0.3, 0.8, z, 0.07, 0.9, 0.07, 0x6b4a2a));
+    out.push(B(x + 0.3, 0.8, z, 0.07, 0.9, 0.07, 0x6b4a2a));
+    out.push(B(x, 1.28, z, 0.8, 0.1, 0.52, 0xb5483a));
+    out.push(B(x, 1.37, z, 0.6, 0.08, 0.36, 0xc9573f));
+    out.push(B(x, 0.95, z, 0.04, 0.3, 0.04, 0xe3b94a));
+  }
+  function tentBoxes(out, x, z) {           // tall
+    out.push(B(x, 0.18, z, 0.9, 0.36, 0.8, 0xd9573f));
+    out.push(B(x, 0.46, z, 0.7, 0.2, 0.6, 0xe8714f));
+    out.push(B(x, 0.66, z, 0.4, 0.2, 0.34, 0xf08a60));
+    out.push(B(x, 0.82, z, 0.1, 0.14, 0.1, 0xffd23f));
+    out.push(B(x, 0.16, z + 0.405, 0.24, 0.28, 0.02, 0x3b2418));
+    out.push(B(x + 0.45, 0.2, z + 0.2, 0.04, 0.4, 0.04, 0x8d5a2b));
+  }
+  function logPileBoxes(out, x, z) {        // small
+    out.push(B(x - 0.2, 0.13, z, 0.3, 0.26, 0.7, 0x8a5a2b));
+    out.push(B(x + 0.2, 0.13, z, 0.3, 0.26, 0.7, 0x7a4f26));
+    out.push(B(x, 0.38, z, 0.3, 0.26, 0.7, 0x9a6a38));
+    out.push(B(x - 0.2, 0.13, z + 0.355, 0.22, 0.22, 0.02, 0xd9a766));
+    out.push(B(x + 0.2, 0.13, z + 0.355, 0.22, 0.22, 0.02, 0xd9a766));
+    out.push(B(x, 0.38, z + 0.355, 0.22, 0.22, 0.02, 0xe0b074));
+  }
+  function pumpkinBoxes(out, x, z) {        // small
+    out.push(B(x - 0.15, 0.15, z, 0.36, 0.3, 0.34, 0xf28a1c));
+    out.push(B(x + 0.2, 0.12, z + 0.1, 0.28, 0.24, 0.28, 0xe57a10));
+    out.push(B(x - 0.15, 0.34, z, 0.06, 0.08, 0.06, 0x3f7a2f));
+    out.push(B(x + 0.2, 0.26, z + 0.1, 0.05, 0.06, 0.05, 0x3f7a2f));
+    out.push(B(x + 0.02, 0.05, z - 0.28, 0.3, 0.03, 0.1, 0x4a9a3a));
+  }
+  function pondBoxes(out, x, z) {           // small
+    out.push(B(x, 0.04, z, 0.9, 0.08, 0.84, 0x8a8f96));
+    out.push(B(x, 0.085, z, 0.76, 0.02, 0.7, 0x4fa6d8));
+    out.push(B(x + 0.12, 0.1, z - 0.1, 0.2, 0.02, 0.2, 0x3fb04c));
+    out.push(B(x - 0.1, 0.1, z + 0.14, 0.12, 0.02, 0.12, 0x3fb04c));
+    out.push(B(x - 0.38, 0.22, z + 0.3, 0.04, 0.36, 0.04, 0x6a9a3a));
+    out.push(B(x - 0.32, 0.2, z + 0.34, 0.04, 0.3, 0.04, 0x7aaa4a));
+  }
+
   var OBSTACLE_ODDS = [
-    { value: 'tree', weight: 0.38 }, { value: 'rock', weight: 0.11 }, { value: 'bush', weight: 0.13 },
+    { value: 'tree', weight: 0.24 }, { value: 'rock', weight: 0.11 }, { value: 'bush', weight: 0.13 },
     { value: 'hay', weight: 0.09 }, { value: 'fence', weight: 0.08 }, { value: 'scarecrow', weight: 0.04 },
     { value: 'stump', weight: 0.05 }, { value: 'barrels', weight: 0.05 }, { value: 'sunflower', weight: 0.05 },
-    { value: 'mushroom', weight: 0.02 }
+    { value: 'mushroom', weight: 0.02 },
+    { value: 'well', weight: 0.03 }, { value: 'tent', weight: 0.03 }, { value: 'logpile', weight: 0.04 },
+    { value: 'pumpkins', weight: 0.04 }, { value: 'pond', weight: 0.03 }
   ];
   // One random blocker for a tile (all of them stop the chicken like a tree does).
   function obstacleBoxes(out, x, z, biome) {
@@ -177,13 +222,18 @@ var Models = (function () {
       case 'stump': stumpBoxes(out, x, z); break;
       case 'barrels': barrelBoxes(out, x, z); break;
       case 'sunflower': sunflowerBoxes(out, x, z); break;
+      case 'well': wellBoxes(out, x, z); break;
+      case 'tent': tentBoxes(out, x, z); break;
+      case 'logpile': logPileBoxes(out, x, z); break;
+      case 'pumpkins': pumpkinBoxes(out, x, z); break;
+      case 'pond': pondBoxes(out, x, z); break;
       default: mushroomBoxes(out, x, z);
     }
     return kind;
   }
 
   // Low obstacles the Jump power-up can hop over (trees, scarecrows and sunflowers are too tall).
-  var SMALL_KINDS = { rock: 1, bush: 1, hay: 1, fence: 1, stump: 1, barrels: 1, mushroom: 1 };
+  var SMALL_KINDS = { rock: 1, bush: 1, hay: 1, fence: 1, stump: 1, barrels: 1, mushroom: 1, logpile: 1, pumpkins: 1, pond: 1 };
   function isSmallObstacle(kind) { return !!SMALL_KINDS[kind]; }
 
   // Scenery material: like the shared voxel material, but everything above the
@@ -397,6 +447,37 @@ var Models = (function () {
     return o;
   } };
 
+
+  // ---- fast small bikes and the stampede herd ----
+  VEHICLES.bicycle = { len: 0.9, build: function (c) {
+    var o = [], jacket = Utils.choice([0xe53935, 0x3f7fe0, 0xffa726, 0x35b86b, 0x9b59d0]);
+    o.push(B(0.3, 0.17, 0, 0.34, 0.34, 0.06, DARK)); o.push(B(-0.3, 0.17, 0, 0.34, 0.34, 0.06, DARK));
+    o.push(B(0.3, 0.17, 0, 0.14, 0.14, 0.07, 0x9a9a9a)); o.push(B(-0.3, 0.17, 0, 0.14, 0.14, 0.07, 0x9a9a9a));
+    o.push(B(0, 0.34, 0, 0.62, 0.05, 0.05, c));
+    o.push(B(0.26, 0.42, 0, 0.05, 0.3, 0.05, c));
+    o.push(B(-0.12, 0.46, 0, 0.05, 0.28, 0.05, c));
+    o.push(B(0.3, 0.58, 0, 0.05, 0.05, 0.34, 0x333333));
+    o.push(B(-0.12, 0.62, 0, 0.18, 0.05, 0.1, 0x222222));
+    o.push(B(-0.08, 0.8, 0, 0.2, 0.3, 0.24, jacket));
+    o.push(B(-0.02, 1.04, 0, 0.2, 0.2, 0.2, 0xf0d0a0));
+    o.push(B(-0.02, 1.15, 0, 0.26, 0.1, 0.26, c));
+    o.push(B(0.12, 0.8, 0.12, 0.3, 0.06, 0.06, jacket)); o.push(B(0.12, 0.8, -0.12, 0.3, 0.06, 0.06, jacket));
+    o.push(B(-0.02, 0.46, 0.08, 0.08, 0.3, 0.06, 0x2b3a6b)); o.push(B(-0.02, 0.46, -0.08, 0.08, 0.3, 0.06, 0x2b3a6b));
+    return o;
+  } };
+  VEHICLES.herd = { len: 1.0, build: function () {     // a bison
+    var o = [], fur = Utils.choice([0x6b4a2a, 0x5a3e22, 0x7a5632]);
+    [[0.3, 0.18], [0.3, -0.18], [-0.3, 0.18], [-0.3, -0.18]].forEach(function (l) { o.push(B(l[0], 0.14, l[1], 0.12, 0.28, 0.12, 0x3b2a18)); });
+    o.push(B(-0.05, 0.5, 0, 0.8, 0.4, 0.5, fur));
+    o.push(B(0.0, 0.76, 0, 0.5, 0.2, 0.46, Utils.shade(fur, -0.1)));          // hump
+    o.push(B(0.46, 0.46, 0, 0.3, 0.32, 0.38, Utils.shade(fur, 0.1)));         // head
+    o.push(B(0.62, 0.38, 0, 0.1, 0.14, 0.18, 0x222222));
+    o.push(B(0.5, 0.62, 0.2, 0.06, 0.1, 0.06, 0xf0ead6)); o.push(B(0.5, 0.62, -0.2, 0.06, 0.1, 0.06, 0xf0ead6));
+    o.push(B(0.6, 0.52, 0.12, 0.05, 0.05, 0.05, 0x111111)); o.push(B(0.6, 0.52, -0.12, 0.05, 0.05, 0.05, 0x111111));
+    o.push(B(-0.5, 0.56, 0, 0.1, 0.22, 0.08, fur));
+    return o;
+  } };
+
   function pickVehicleKind() {
     return Utils.weightedChoice([
       { value: 'sedan', weight: 0.24 }, { value: 'taxi', weight: 0.09 }, { value: 'police', weight: 0.05 },
@@ -415,7 +496,6 @@ var Models = (function () {
         : Utils.choice(palette);
     var variant = Utils.randInt(0, 2);
     var mesh = cachedMesh('veh:' + (biome || '') + ':' + kind + ':' + color + ':' + variant, function () { return def.build(color); }, bm && bm.material);
-    if (bm && bm.decorate) bm.decorate(mesh, kind, color, def.len);   // a biome may add glow, trails...
     mesh.add(buildBeam(def.len)); // headlight glow, only drawn at night
     return mesh;
   }
@@ -458,12 +538,14 @@ var Models = (function () {
   // ---------------------------------------------------------------------
   // River floaters
   // ---------------------------------------------------------------------
-  function buildLog(length, biome) {
+  // variant 'rotten': a crumbling log that sinks soon after you step on it
+  function buildLog(length, biome, variant) {
     var bm = biomeOf(biome);
-    return cachedMesh('log:' + (biome || '') + ':' + length + ':' + Utils.randInt(0, 2), function () { return bm ? bm.logBoxes(length) : logBoxes(length); }, bm && bm.material);
+    return cachedMesh('log:' + (biome || '') + ':' + length + ':' + (variant || '') + ':' + Utils.randInt(0, 2), function () { return bm ? bm.logBoxes(length, variant) : logBoxes(length, variant); }, bm && bm.material);
   }
 
-  function logBoxes(length) {
+  function logBoxes(length, variant) {
+    if (variant === 'rotten') return rottenLogBoxes(length);
     var o = [];
     o.push(B(0, 0, 0, length, 0.34, 0.78, 0x8a5a2e));
     o.push(B(0, -0.11, 0, length + 0.02, 0.12, 0.8, 0x6e4423));
@@ -477,10 +559,31 @@ var Models = (function () {
     return o;
   }
 
+  // A rotten log: grey-brown, split by dark cracks, with moss, and a few missing chunks.
+  function rottenLogBoxes(length) {
+    var o = [];
+    o.push(B(0, 0, 0, length, 0.34, 0.78, 0x6b5a48));
+    o.push(B(0, -0.11, 0, length + 0.02, 0.12, 0.8, 0x4f4236));
+    o.push(B(0, 0.175, 0, length * 0.94, 0.02, 0.56, 0x80705a));
+    o.push(B(length / 2 + 0.01, 0, 0, 0.04, 0.36, 0.8, 0xa89880));
+    o.push(B(-length / 2 - 0.01, 0, 0, 0.04, 0.36, 0.8, 0xa89880));
+    var n = Math.floor(length) + 1;
+    for (var i = 0; i < n; i++) {
+      var x = -length / 2 + (i + 0.5) * (length / n);
+      o.push(B(x, 0.19, 0, 0.05, 0.02, 0.62, 0x2d241c));                       // crack across the top
+      o.push(B(x + 0.2, 0.19, Utils.randRange(-0.2, 0.2), 0.26, 0.025, 0.2, 0x5f8a3f));   // moss
+    }
+    o.push(B(0, -0.02, 0.4, length * 0.5, 0.2, 0.02, 0x3a2f25));
+    return o;
+  }
+
   // A group of n turtles that paddle along; the world makes them dive now and then.
   function buildTurtles(n, biome) {
     var bm = biomeOf(biome);
-    if (bm) return Utils.voxelMesh(bm.turtleBoxes(n), bm.material ? { material: bm.material } : undefined);
+    return cachedMesh('turtles:' + (biome || '') + ':' + n, function () { return bm ? bm.turtleBoxes(n) : forestTurtleBoxes(n); }, bm && bm.material);
+  }
+
+  function forestTurtleBoxes(n) {
     var o = [];
     for (var i = 0; i < n; i++) {
       var x = (i - (n - 1) / 2) * 1.05;
@@ -497,7 +600,7 @@ var Models = (function () {
       o.push(B(x - 0.26, -0.04, -0.38, 0.2, 0.05, 0.12, 0xb8d84a));
       o.push(B(x - 0.46, 0.0, 0, 0.1, 0.06, 0.06, 0xb8d84a));
     }
-    return Utils.voxelMesh(o);
+    return o;
   }
 
   var _padGeo = null, _padMat = null, _flowerMat = null, _flowerGeo = null;
@@ -600,13 +703,15 @@ var Models = (function () {
     var g = new THREE.Group();
     var bm = biomeOf(biome);
     var st = (bm && bm.signalStyle) || { base: 0x555a63, pole: 0x8a8d96, housing: 0x23262b, cap: 0xe53935, extra: [] };
-    g.add(Utils.voxelMesh([
-      B(0, 0.05, 0, 0.3, 0.1, 0.3, st.base),
-      B(0, 0.7, 0, 0.1, 1.3, 0.1, st.pole),
-      B(0, 1.4, 0, 0.36, 0.66, 0.18, st.housing),
-      B(0, 1.76, 0, 0.42, 0.06, 0.24, st.cap),
-      B(0, 1.73, 0, 0.06, 0.1, 0.06, st.housing)
-    ].concat(st.extra || []), bm && bm.material ? { material: bm.material } : undefined));
+    g.add(cachedMesh('signal:' + (biome || ''), function () {
+      return [
+        B(0, 0.05, 0, 0.3, 0.1, 0.3, st.base),
+        B(0, 0.7, 0, 0.1, 1.3, 0.1, st.pole),
+        B(0, 1.4, 0, 0.36, 0.66, 0.18, st.housing),
+        B(0, 1.76, 0, 0.42, 0.06, 0.24, st.cap),
+        B(0, 1.73, 0, 0.06, 0.1, 0.06, st.housing)
+      ].concat(st.extra || []);
+    }, bm && bm.material));
     var red = [], green = [];
     [-1, 1].forEach(function (sz) {
       var r = new THREE.Mesh(A.geo, A.redOff);
@@ -723,8 +828,8 @@ var Models = (function () {
     return g;
   }
 
-  // One of everything with its own material, so the renderer can compile
-  // every shader up front instead of hitching the first time one appears.
+  // One of everything (including every special material), so the renderer can
+  // compile every shader up front instead of hitching the first time one appears.
   function buildWarmGroup() {
     var g = new THREE.Group();
     g.add(buildCoin());
@@ -867,7 +972,7 @@ var Models = (function () {
       o.push(B(hx + 0.02 + t * 0.14, -0.04, 0.24, 0.06, 0.08, 0.04, 0xffffff));
       o.push(B(hx + 0.02 + t * 0.14, -0.04, -0.24, 0.06, 0.08, 0.04, 0xffffff));
     }
-    g.add(Utils.voxelMesh(o));
+    g.add(cachedMesh('croc:' + (biome || '') + ':' + L, function () { return o; }));
     var jaw = new THREE.Group();
     jaw.position.set(L / 2 - CROC_HEAD, -0.06, 0);
     var j = [
@@ -879,9 +984,9 @@ var Models = (function () {
       j.push(B(0.2 + u * 0.18, 0.07, 0.2, 0.06, 0.09, 0.04, 0xffffff));
       j.push(B(0.2 + u * 0.18, 0.07, -0.2, 0.06, 0.09, 0.04, 0xffffff));
     }
-    jaw.add(Utils.voxelMesh(j));
+    jaw.add(cachedMesh('crocjaw:' + (biome || ''), function () { return j; }));
     g.add(jaw);
-    return { group: g, jaw: jaw, length: L, headLen: CROC_HEAD };
+    return { group: g, jaw: jaw };
   }
 
   // ---------------------------------------------------------------------
@@ -915,7 +1020,7 @@ var Models = (function () {
     [-1, 1].forEach(function (s) {
       var o = [
         B(0, 0.2, 0, 0.62, 0.4, 0.62, cols.stone),
-        B(0, 1.2, 0, 0.42, 1.6, 0.42, H_shade(cols.stone, 0.12)),
+        B(0, 1.2, 0, 0.42, 1.6, 0.42, Utils.shade(cols.stone, 0.12)),
         B(0, 0.5, 0, 0.46, 0.06, 0.46, cols.trim),
         B(0, 1.5, 0, 0.46, 0.06, 0.46, cols.trim),
         B(0, 2.1, 0, 0.6, 0.18, 0.6, cols.stone),
@@ -924,11 +1029,19 @@ var Models = (function () {
       var m = Utils.voxelMesh(o);
       m.position.x = s * (CONFIG.PLAY_HALF + 1.6);
       g.add(m);
-      g.userData['gem' + (s > 0 ? 'R' : 'L')] = m;
     });
     return g;
   }
-  function H_shade(c, a) { return Utils.shade(c, a); }
+
+  // The two rails of a railway lane (one shared geometry per rail colour).
+  function buildRails(color) {
+    var vh = CONFIG.GROUND_VISUAL_HALF;
+    var m = cachedMesh('rails:' + color, function () {
+      return [B(0, 0.04, 0.28, vh * 2, 0.07, 0.07, color), B(0, 0.04, -0.28, vh * 2, 0.07, 0.07, color)];
+    });
+    m.castShadow = false;
+    return m;
+  }
 
   return {
     helpers: {
@@ -949,10 +1062,13 @@ var Models = (function () {
     setWind: function (t) { _windU.value = t; },
     buildTurtles: buildTurtles,
     rockBoxes: rockBoxes,
-    bushBoxes: bushBoxes,
     flowerBoxes: flowerBoxes,
     pickVehicleKind: pickVehicleKind,
-    vehicleLength: function (kind) { return VEHICLES[kind].len; },
+    vehicleLength: function (kind, biome) {
+      var bm = biomeOf(biome);
+      return ((bm && bm.vehicles[kind]) || VEHICLES[kind]).len;
+    },
+    buildRails: buildRails,
     buildVehicle: buildVehicle,
     buildLog: buildLog,
     buildPad: buildPad,

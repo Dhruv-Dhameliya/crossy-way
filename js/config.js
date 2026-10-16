@@ -24,9 +24,7 @@ var CONFIG = {
   CAMERA_FOLLOW_Z: 9,       // forward follow stiffness
 
   // The camera simply follows the chicken (it never drags you toward a corner).
-  // The only ways to lose: hit a hazard, or dawdle until the eagle comes.
-  IDLE_WARN: 8,             // seconds without reaching a new row -> HURRY warning
-  IDLE_EAGLE: 12,           // ...and the eagle arrives
+  // The only ways to lose: hit a hazard, or dawdle until the eagle comes (see DIFFICULTY.eagle).
   MAX_BACKTRACK: 5,         // how many rows back from your best row you may hop
 
   // With the fixed camera a sideways hop in +worldX projects as screen-LEFT
@@ -53,14 +51,14 @@ var CONFIG = {
 
   // Collectible power-ups (dur in seconds; blast is instant). weight = spawn odds.
   POWERUPS: {
-    magnet: { label: 'MAGNET', icon: '🧲', color: '#ff5a5f', dur: 10, weight: 0.2, blurb: 'Coins fly to you' },
-    ghost:  { label: 'GHOST', icon: '👻', color: '#9ad7ff', dur: 7, weight: 0.15, blurb: 'Traffic passes through' },
-    shield: { label: 'SHIELD', icon: '🛡️', color: '#3d8bff', dur: 16, weight: 0.2, blurb: 'Survives one hit' },
-    freeze: { label: 'FREEZE', icon: '❄️', color: '#5fe3ff', dur: 6, weight: 0.13, blurb: 'Stops all traffic' },
-    double: { label: '2X COINS', icon: '💰', color: '#ffc107', dur: 12, weight: 0.15, blurb: 'Coins count double' },
-    jump:   { label: 'JUMP', icon: '🦘', color: '#6dd34a', dur: 14, weight: 0.14, blurb: 'Hop over small obstacles' },
-    skiplane: { label: 'SKIP LANE', icon: '⏭️', color: '#ff9f1c', dur: 8, weight: 0.09, blurb: 'Leap over a whole lane at once' },
-    blast:  { label: 'BLAST', icon: '💣', color: '#ff7a1a', dur: 0, weight: 0.17, blurb: 'Clears nearby traffic' }
+    magnet: { label: 'MAGNET', icon: '🧲', color: '#ff5a5f', dur: 10, weight: 0.2 },
+    ghost:  { label: 'GHOST', icon: '👻', color: '#9ad7ff', dur: 7, weight: 0.15 },
+    shield: { label: 'SHIELD', icon: '🛡️', color: '#3d8bff', dur: 16, weight: 0.2 },
+    freeze: { label: 'FREEZE', icon: '❄️', color: '#5fe3ff', dur: 6, weight: 0.13 },
+    double: { label: '2X COINS', icon: '💰', color: '#ffc107', dur: 12, weight: 0.15 },
+    jump:   { label: 'JUMP', icon: '🦘', color: '#6dd34a', dur: 14, weight: 0.14 },
+    skiplane: { label: 'SKIP LANE', icon: '⏭️', color: '#ff9f1c', dur: 8, weight: 0.09 },
+    blast:  { label: 'BLAST', icon: '💣', color: '#ff7a1a', dur: 0, weight: 0.17 }
   },
 
   BEST_SCORE_KEY: 'crossy_way_best_score',
@@ -75,7 +73,9 @@ var CONFIG = {
   // eagle = seconds of standing still before the eagle arrives (its cry comes 3 s earlier),
   // ramp = rows until full difficulty, special = how often unusual lanes (turtles) appear,
   // spread = how different vehicle speeds in one lane are (tighter = busier, convoy-like roads).
+  // coins = coin density (Zen only), eagle: Infinity = no eagle at all.
   DIFFICULTY: {
+    zen:     { label: 'Zen',     icon: '🧘', speed: 0.7,  traffic: 0.6,  train: 2,    trainWarn: 3,   eagle: Infinity, ramp: 300, special: 0.35, spread: 1, coins: 2, blurb: 'Relax: no eagle and no timer. Slow, calm traffic and lots of coins. Great for learning the game.' },
     easy:    { label: 'Easy',    icon: '🌱', speed: 0.78, traffic: 0.78, train: 1.5,  trainWarn: 2.4, eagle: 12,  ramp: 260, special: 0.6, spread: 1, blurb: 'Slower, calmer traffic. Trains are rare and the eagle waits 12 seconds.' },
     medium:  { label: 'Medium',  icon: '⚡', speed: 1,    traffic: 1,    train: 1,    trainWarn: 1.9, eagle: 9,   ramp: 180, special: 1,   spread: 1, blurb: 'The classic mix. The eagle comes after 9 seconds.' },
     hard:    { label: 'Hard',    icon: '🔥', speed: 1.25, traffic: 1.25, train: 0.75, trainWarn: 1.6, eagle: 7.5, ramp: 140, special: 1.3, spread: 0.8, blurb: 'Faster, busier roads, more trains, and the eagle after 7.5 seconds.' },
@@ -112,12 +112,16 @@ var Difficulty = {
 // for a particular biome: it only asks the row's theme for optional hooks (a hook
 // that is missing means "do the normal Forest thing"), so a theme cannot break
 // the Forest. Hooks a theme may provide:
-//   label, enter {text,color}, colors, backdrop, musicMood, idleWarn(),
+//   label, enter {text,color}, colors, backdrop, musicMood, idleWarn(), stat,
 //   ground(kit, type, parity, edge, variant, tiles, colors), sceneryMaterial(),
-//   vehicleBob(v, row, t), logSway(log, t), diveColors, fallsInWater, noRails,
+//   vehicleBob(v, row, t), logSway(log, t), diveColors, crumbleColors, dustColors,
+//   fallsInWater, noRails, storm {toast, color, sound},
 //   trainAudio {warn, ping, toot, pass}, attack {begin, update, reset, duration},
-//   suit(), shadowGlow, puffColors, fallColors, sky/fx (see weather.js),
-//   card {bg(c,W,H), ...} (share card), update(dt, time)
+//   suit(), puffColors, fallColors, sky, fx {init, update, label} (see weather.js),
+//   card {bg: [[stop, color]...], deco(c, W, H, rnd), label, tagBg, chipFill, chipStroke,
+//   chipText, foot, host} (share card)
+// Models are registered separately with Models.registerBiome (see models.js);
+// achievements marked biome: 'name' only exist while that theme is installed.
 // ---------------------------------------------------------------------------
 CONFIG.BIOME_COLORS = {
   forest: Object.assign({}, CONFIG.COLORS, {
@@ -137,7 +141,7 @@ var Biome = {
   })(),
   LEN: 110,                      // rows per biome in auto mode
   themes: {
-    forest: { name: 'forest', label: '\U0001F332 FOREST', enter: { text: '\U0001F332 BACK ON EARTH!', color: '#3fb04c' } }
+    forest: { name: 'forest', label: '🌲 FOREST', enter: { text: '🌲 BACK ON EARTH!', color: '#3fb04c' } }
   },
   register: function (name, theme) { theme.name = name; this.themes[name] = theme; },
   list: function () { return Object.keys(this.themes); },

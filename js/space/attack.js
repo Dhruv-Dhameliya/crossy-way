@@ -6,6 +6,7 @@
 //  carry - the saucer zips away
 var SpaceAttack = (function () {
   var ufo = null, beam = null;
+  var SPARK = { colors: [0xffffff, 0xc8dcf0, 0x9fc0e0], count: 1, speed: 0.4, up: 1.5, size: 0.09, life: 0.7, gravity: -2, spread: 0.1, floor: -9 };
 
   function ensure(p) {
     if (ufo) return;
@@ -63,7 +64,7 @@ var SpaceAttack = (function () {
         p.eaglePhase = 'beam';
         p.eaglePhaseT = 0;
         beam.visible = true;
-        Particles.ring(p.x, p.y + 0.05, p.z, 0x9ff6ff, 2.4);
+        Particles.ring(p.x, p.y + 0.05, p.z, 0xc8dcf0, 2.4);
         if (GameAudio && GameAudio.squawk) GameAudio.squawk();
         if (p.onEagleGrab) p.onEagleGrab(p.eagleGrabPoint);
       }
@@ -87,7 +88,7 @@ var SpaceAttack = (function () {
       p.eagleFeatherT -= dt;
       if (p.eagleFeatherT <= 0) {
         p.eagleFeatherT = 0.05;
-        Particles.burst(p.x + Utils.randRange(-0.4, 0.4), yy - 0.3, p.z + Utils.randRange(-0.4, 0.4), { colors: [0xffffff, 0x9ff6ff, 0x00e5ff, 0xff2bd6], count: 1, speed: 0.4, up: 1.5, size: 0.09, life: 0.7, gravity: -2, spread: 0.1, floor: -9 });
+        Particles.burst(p.x + Utils.randRange(-0.4, 0.4), yy - 0.3, p.z + Utils.randRange(-0.4, 0.4), SPARK);
       }
       sh.position.set(hover.x, ground, hover.z);
       sh.scale.set(1.5, 1, 1.5);
