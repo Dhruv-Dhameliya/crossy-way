@@ -124,8 +124,8 @@ var Particles = (function () {
     sparkle: function (x, y, z) {
       burst(x, y, z, { colors: [0xfff0a0, 0xffd23f, 0xffffff], count: 8, speed: 2.2, up: 3, size: 0.09, life: 0.5, gravity: 4, spread: 0.1 });
     },
-    puff: function (x, y, z) {
-      burst(x, y, z, { colors: [0xe8f5d8, 0xcfe8b8], count: 4, speed: 1.1, up: 1.2, size: 0.1, life: 0.35, gravity: 3, spread: 0.3, floor: y });
+    puff: function (x, y, z, colors) {
+      burst(x, y, z, { colors: colors || [0xe8f5d8, 0xcfe8b8], count: 4, speed: 1.1, up: 1.2, size: 0.1, life: 0.35, gravity: 3, spread: 0.3, floor: y });
     }
   };
 })();

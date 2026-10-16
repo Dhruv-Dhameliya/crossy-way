@@ -19,6 +19,7 @@
     href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;500;600;700&family=Lilita+One&family=Press+Start+2P&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/space.css" />
 </head>
 
 <body>
@@ -177,7 +178,7 @@
         <li>🐊 <b>Crocodile logs:</b> the back is safe, but the head snaps shut. Stay away when the mouth opens!</li>
         <li>🧊 <b>Ice:</b> you keep sliding a little after you land. Plan your next hop.</li>
         <li>🪨 <b>Chasms:</b> only moving platforms cross them. Time your hop, don't fall in.</li>
-        <li>🚀 <b>Space:</b> run far enough and the world turns into space. Rockets, crystals, astronauts and aliens block the way; spaceships replace the traffic, rivers are empty space crossed on broken asteroids, and maglev trains replace the trains. Pick a biome in Settings → World.</li>
+        <li>🚀 <b>Space:</b> run far enough and the world turns into a neon space. Ships fly over light-bridges, rivers are empty space crossed on broken asteroids, comets replace trains (watch the beacons!), laser strikes replace crocodiles and a UFO replaces the eagle. Pick a biome in Settings → World.</li>
         <li>🦅 <b>The eagle:</b> if you stand still you'll hear it screech. 3 seconds later it grabs you.</li>
         <li>🚑 Special vehicles: ambulances, ice-cream trucks, tractors, motorbikes and fast sports cars.</li>
         <li>🌲 Hay bales, fences, scarecrows, barrels and more block your way.</li>
@@ -351,10 +352,17 @@
   <script src="js/weather.js"></script>
   <script src="js/textures.js"></script>
   <script src="js/models.js"></script>
-  <script src="js/models_space.js"></script>
   <script src="js/particles.js"></script>
   <script src="js/world.js"></script>
   <script src="js/player.js"></script>
+  <!-- Space biome (self-contained: remove these lines and css/space.css and the game is just the Forest) -->
+  <script src="js/space/audio.js"></script>
+  <script src="js/space/textures.js"></script>
+  <script src="js/space/models.js"></script>
+  <script src="js/space/attack.js"></script>
+  <script src="js/space/fx.js"></script>
+  <script src="js/space/music.js"></script>
+  <script src="js/space/theme.js"></script>
   <script src="js/game.js"></script>
 </body>
 

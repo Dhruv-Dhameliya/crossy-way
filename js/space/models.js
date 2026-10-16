@@ -2,18 +2,20 @@
 // belongs in space, with the same footprint and the same "kind" so the rules
 // stay identical (a rocket blocks a tile like a tree, a supply crate can be
 // hopped over like a hay bale...):
-//   traffic   -> spaceships (fighters, freighters, liners, saucers...)
+//   traffic   -> spaceships flying over an energy light-bridge (no roads in space)
 //   rivers    -> empty space, crossed on broken asteroid chunks and wreckage
 //   turtles   -> satellites that power down
-//   crocodile -> a void worm
+//   trains    -> blazing comets (no railways in space)
+//   crocodile -> an orbital laser strike on an asteroid
+//   eagle     -> a UFO with a tractor beam
 //   obstacles -> rockets, crystals, stranded astronauts, domes, aliens...
 // Registered into Models, which picks them by biome.
-(function () {
+var SpaceModels = (function () {
   var H = Models.helpers;
   var B = H.B;
   var shade = H.shade, choice = H.choice, rr = H.randRange, ri = H.randInt;
   var GLASS = 0x8fefff, HULL = 0xe6ecfa, PANEL = 0x7480a6, DARKP = 0x1b1e33, STEEL = 0x3a3f5c;
-  var CYAN = 0x4de8ff, VIOLET = 0x8f6bff, PINK = 0xff5fd2, ORANGE = 0xff8a3d, RED = 0xff4f5a, GREEN = 0x45e6a8;
+  var CYAN = 0x00e5ff, VIOLET = 0xa24dff, PINK = 0xff2bd6, ORANGE = 0xff7a00, RED = 0xff2d55, GREEN = 0x39ff88;
 
   function BR(x, y, z, w, h, d, c, ry, rx, rz) {
     var b = B(x, y, z, w, h, d, c);
@@ -24,7 +26,7 @@
   }
 
   // ===================================================================== scenery
-  var CRYSTALS = [[0x7a5cff, 0xb7a3ff, 0xe3dbff], [0x23c9e8, 0x8ef0ff, 0xd4fbff], [0xff5fd2, 0xffa6e8, 0xffe0f6], [0x45e6a8, 0xa4ffd8, 0xe0fff2]];
+  var CRYSTALS = [[0x9d4dff, 0xc58bff, 0xf0e0ff], [0x00d9ff, 0x66f0ff, 0xd4fbff], [0xff2bd6, 0xff7de6, 0xffe0f9], [0x39ff88, 0x8dffbb, 0xe0fff0]];
 
   function crystal(out, x, z, kind) {
     var p = choice(CRYSTALS);
@@ -47,7 +49,7 @@
     out.push(B(x, 0.25, z, 0.5, 0.5, 0.5, 0x2c2f4d));
     out.push(B(x, 0.8, z, 0.34, 0.8, 0.34, 0x3a3e66));
     out.push(B(x, 0.9, z, 0.37, 0.07, 0.37, CYAN));
-    out.push(B(x, 1.28, z, 0.37, 0.07, 0.37, CYAN));
+    out.push(B(x, 1.28, z, 0.37, 0.07, 0.37, PINK));
     out.push(B(x, 1.4, z, 0.2, 0.2, 0.2, 0x4a4f80));
   }
 
@@ -405,7 +407,7 @@
     return o;
   } };
 
-  var SHIP_COLORS = [0xff5a5f, 0x4f8bff, 0x45e6a8, 0xff9f1c, 0xc36bff, 0xf2f2f2, 0xff7ad9];
+  var SHIP_COLORS = [0xff2bd6, 0x00e5ff, 0x39ff88, 0xffd60a, 0xa24dff, 0xff6a00, 0x3d7bff];
 
   // ===================================================================== floaters
   // Rivers are empty space: you cross on destroyed asteroids. Irregular,
@@ -455,7 +457,7 @@
     var m = rockPad();
     m.rotation.y = rr(0, Math.PI);
     if (withGem) {
-      var g = Utils.voxelMesh([B(0.1, 0.16, -0.06, 0.12, 0.2, 0.12, PINK), B(0.1, 0.3, -0.06, 0.06, 0.1, 0.06, 0xffd0f4)]);
+      var g = Utils.voxelMesh([B(0.1, 0.16, -0.06, 0.12, 0.2, 0.12, PINK), B(0.1, 0.3, -0.06, 0.06, 0.1, 0.06, 0xffd0f4)], { material: neonMaterial() });
       m.add(g);
     }
     return m;
@@ -481,93 +483,255 @@
     return o;
   }
 
-  // ===================================================================== trains
-  function maglevLoco() {
+  // ===================================================================== comets
+  // There are no railways in space: a blazing comet streaks across the lane instead.
+  // Same rules as a train (warning first, then it crosses fast and hits anything in
+  // its path); its length is made of segments just like train cars.
+  function cometHead() {
     var o = [];
-    o.push(B(0, 0.26, 0, 1.65, 0.26, 0.9, 0x2a2e4a));
-    o.push(B(0, 0.12, 0, 1.5, 0.04, 0.6, CYAN));
-    o.push(B(-0.2, 0.74, 0, 1.2, 0.7, 0.92, HULL));
-    o.push(B(0.52, 0.62, 0, 0.5, 0.46, 0.86, 0xc9d3ee));
-    o.push(B(0.78, 0.52, 0, 0.14, 0.28, 0.7, 0xaab8de));
-    o.push(B(-0.2, 1.12, 0, 1.24, 0.08, 0.96, PANEL));
-    o.push(B(0.05, 0.86, 0.465, 0.9, 0.3, 0.02, GLASS));
-    o.push(B(0.05, 0.86, -0.465, 0.9, 0.3, 0.02, GLASS));
-    o.push(B(0.6, 0.78, 0, 0.3, 0.2, 0.7, GLASS));
-    o.push(B(-0.2, 0.5, 0.465, 1.2, 0.07, 0.02, CYAN));
-    o.push(B(-0.2, 0.5, -0.465, 1.2, 0.07, 0.02, CYAN));
-    o.push(B(0.85, 0.5, 0, 0.04, 0.12, 0.26, 0xffffff));
+    o.push(B(0.12, 0.5, 0, 1.1, 0.8, 0.8, 0x5a4a46));            // rocky nucleus
+    o.push(B(0.35, 0.78, 0.08, 0.7, 0.5, 0.66, 0x7a625a));
+    o.push(B(0.7, 0.42, -0.08, 0.5, 0.5, 0.64, 0x4a3c3a));
+    o.push(B(0.5, 0.96, 0.1, 0.34, 0.06, 0.3, 0xcdeffa));        // ice patch
+    o.push(B(0.78, 0.7, 0.2, 0.1, 0.34, 0.24, 0xcdeffa));
+    o.push(B(-0.5, 0.52, 0, 0.7, 0.72, 0.84, 0xff6a2d));          // burning rear half
+    o.push(B(-0.78, 0.52, 0, 0.4, 0.55, 0.7, 0xffb02e));
+    o.push(B(-0.45, 0.9, 0.12, 0.34, 0.2, 0.3, 0xffd23f));
+    o.push(B(0.1, 0.3, 0.405, 0.6, 0.05, 0.02, 0xff8a3d));        // lava cracks
+    o.push(B(0.2, 0.6, -0.405, 0.5, 0.04, 0.02, 0xff8a3d));
     return o;
   }
-  var TRAIN_COLORS = [0x6f8cff, 0x45e6a8, 0xff7ad9, 0xffb02e, 0xb7a3ff];
-  function maglevCar(c) {
+  var FIRE = [0xff8a3d, 0xff6a2d, 0xffb02e, 0xff3b6b];
+  function cometTail(c) {            // a ragged tongue of fire, not a solid car
     var o = [];
-    o.push(B(0, 0.24, 0, 1.65, 0.16, 0.8, 0x2a2e4a));
-    o.push(B(0, 0.12, 0, 1.5, 0.04, 0.6, CYAN));
-    o.push(B(0, 0.7, 0, 1.6, 0.76, 0.92, HULL));
-    o.push(B(0, 1.1, 0, 1.64, 0.06, 0.96, PANEL));
-    o.push(B(0, 0.5, 0.465, 1.6, 0.12, 0.02, c));
-    o.push(B(0, 0.5, -0.465, 1.6, 0.12, 0.02, c));
-    for (var i = 0; i < 4; i++) {
-      o.push(B(-0.6 + i * 0.4, 0.84, 0.465, 0.26, 0.26, 0.02, GLASS));
-      o.push(B(-0.6 + i * 0.4, 0.84, -0.465, 0.26, 0.26, 0.02, GLASS));
+    o.push(B(0, 0.42, 0, 1.64, 0.36, 0.5, c));
+    o.push(B(0, 0.42, 0, 1.66, 0.18, 0.3, Utils.shade(c, 0.5)));
+    for (var i = 0; i < 7; i++) {
+      var x = -0.72 + i * 0.24 + rr(-0.05, 0.05);
+      var h = rr(0.2, 0.62), side = i % 2 ? 1 : -1;
+      o.push(B(x, 0.42 + h / 2 + 0.1, side * rr(0.0, 0.18), rr(0.2, 0.34), h, rr(0.22, 0.34), Utils.shade(c, rr(-0.1, 0.35))));
     }
-    o.push(B(0.85, 0.3, 0, 0.12, 0.08, 0.12, PANEL));
+    o.push(B(rr(-0.5, 0.5), 0.16, rr(-0.2, 0.2), 0.3, 0.14, 0.3, Utils.shade(c, -0.25)));
+    o.push(B(-0.55, 0.9, 0.0, 0.14, 0.14, 0.14, 0xfff3b0));      // flying embers
+    o.push(B(0.35, 1.0, 0.1, 0.1, 0.1, 0.1, 0xfff3b0));
     return o;
   }
 
-  // ===================================================================== void worm
-  // The "crocodile" of space: a segmented worm that rides the void. Its head (the
-  // front 1.0) is the dangerous part; the lower jaw pivots to bite.
-  function voidWorm(length) {
+  // a warning beacon pylon (replaces the railway signal)
+  // ===================================================================== laser strike
+  // The "crocodile" of space: a marked patch on an asteroid that charges up and gets
+  // hit by an orbital laser. Only dangerous while the beam is firing.
+  function laserAsteroid(length) {
     var g = new THREE.Group();
     var L = length, headLen = Models.CROC_HEAD;
-    var o = [], bodyEnd = L / 2 - headLen + 0.1;
-    var n = Math.max(3, Math.floor((bodyEnd + L / 2) / 0.42));
-    var seg = (bodyEnd + L / 2) / n;
-    for (var i = 0; i < n; i++) {                                       // ringed segments
-      var x = -L / 2 + (i + 0.5) * seg;
-      var t = i / (n - 1);
-      var c = i % 2 ? 0x6b4fd8 : 0x5a3fc0;
-      var h = 0.3 - 0.08 * (1 - t), w = 0.66 - 0.2 * (1 - t);
-      o.push(B(x, 0.0, 0, seg * 0.96, h, w, c));
-      o.push(B(x, 0.0, 0, seg * 0.2, h + 0.02, w + 0.03, 0x45e6a8));    // glowing ring
-      o.push(B(x, h / 2 + 0.05, 0, 0.1, 0.1, 0.1, 0xb7a3ff));          // dorsal spike
-      o.push(B(x, -0.14, 0, seg * 0.8, 0.06, w * 0.7, 0x2f2370));
-    }
-    o.push(B(-L / 2 - 0.12, -0.02, 0, 0.26, 0.18, 0.26, 0x45e6a8));     // glowing tail tip
+    g.add(Utils.voxelMesh(asteroidBoxes(L), { material: neonMaterial() }));
     var hx = L / 2 - headLen / 2;
-    o.push(B(hx, 0.08, 0, headLen, 0.22, 0.6, 0x6b4fd8));              // upper jaw
-    o.push(B(hx + 0.32, 0.06, 0, 0.4, 0.16, 0.44, 0x8260f0));
-    o.push(B(hx - 0.2, 0.2, 0.2, 0.1, 0.2, 0.1, 0x8260f0));             // eye stalks
-    o.push(B(hx - 0.2, 0.2, -0.2, 0.1, 0.2, 0.1, 0x8260f0));
-    o.push(B(hx - 0.2, 0.34, 0.2, 0.14, 0.14, 0.14, CYAN));
-    o.push(B(hx - 0.2, 0.34, -0.2, 0.14, 0.14, 0.14, CYAN));
-    for (var t2 = 0; t2 < 4; t2++) {
-      o.push(B(hx + 0.02 + t2 * 0.14, -0.05, 0.24, 0.06, 0.1, 0.04, 0xffffff));
-      o.push(B(hx + 0.02 + t2 * 0.14, -0.05, -0.24, 0.06, 0.1, 0.04, 0xffffff));
+    g.add(Utils.voxelMesh([
+      B(hx, 0.19, 0, headLen - 0.04, 0.025, 0.64, 0x3a1018),       // scorched target zone
+      B(hx, 0.2, 0, headLen - 0.3, 0.012, 0.36, 0x5a1a22),
+      B(hx + 0.46, 0.36, 0.26, 0.07, 0.34, 0.07, STEEL),            // emitter masts
+      B(hx + 0.46, 0.56, 0.26, 0.11, 0.08, 0.11, RED),
+      B(hx - 0.46, 0.36, -0.26, 0.07, 0.34, 0.07, STEEL),
+      B(hx - 0.46, 0.56, -0.26, 0.11, 0.08, 0.11, RED)
+    ], { material: neonMaterial() }));
+    var ring = new THREE.Mesh(new THREE.BoxGeometry(headLen - 0.08, 0.03, 0.68),
+      new THREE.MeshBasicMaterial({ color: 0xff3b3b, transparent: true, opacity: 0.2, depthWrite: false }));
+    ring.position.set(hx, 0.215, 0);
+    ring.renderOrder = 2;
+    g.add(ring);
+    var beam = new THREE.Mesh(new THREE.BoxGeometry(headLen - 0.1, 6, 0.6),
+      new THREE.MeshBasicMaterial({ color: 0xaaf6ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    beam.position.set(hx, 3.2, 0);
+    beam.renderOrder = 3;
+    beam.visible = false;
+    g.add(beam);
+    var core = new THREE.Mesh(new THREE.BoxGeometry(0.34, 6, 0.24),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    core.position.set(hx, 3.2, 0);
+    core.renderOrder = 4;
+    core.visible = false;
+    g.add(core);
+    // open: 0 idle, ~0.4 charging (warning), 1 firing
+    function fx(open) {
+      var firing = open > 0.62;
+      ring.material.opacity = 0.2 + open * 0.55 + (open > 0.05 && open < 0.62 ? Math.sin(performance.now() * 0.03) * 0.15 : 0);
+      beam.visible = core.visible = open > 0.3;
+      beam.material.opacity = firing ? 0.55 : Math.max(0, (open - 0.3) * 0.8);
+      core.material.opacity = firing ? 0.9 : 0;
     }
-    g.add(Utils.voxelMesh(o));
-    var jaw = new THREE.Group();
-    jaw.position.set(L / 2 - headLen, -0.06, 0);
-    var j = [
-      B(headLen / 2, -0.04, 0, headLen - 0.02, 0.1, 0.52, 0x3a2f8f),
-      B(headLen / 2, 0.02, 0, headLen - 0.1, 0.04, 0.4, PINK),
-      B(headLen - 0.04, -0.02, 0, 0.1, 0.1, 0.3, 0x3a2f8f)
+    function onFire(vol) { SpaceAudio.laserFire(vol); }
+    function onKill(p) {                       // the orbital laser vaporises the chicken
+      SpaceAudio.zap();
+      Particles.burst(p.x, p.y + 0.5, p.z, { colors: [0xffffff, 0x9ff6ff, 0x00e5ff, 0xff2bd6], count: 22, speed: 3.5, up: 5, size: 0.12, life: 0.7, gravity: 6, spread: 0.3 });
+    }
+    return { group: g, jaw: new THREE.Group(), fx: fx, onFire: onFire, onKill: onKill, length: L, headLen: headLen };
+  }
+
+  // ===================================================================== UFO (eagle)
+  function buildUfo() {
+    var g = new THREE.Group();
+    var o = [
+      B(0, -0.1, 0, 0.8, 0.14, 0.8, 0x59607f),
+      B(0, 0.0, 0, 1.6, 0.14, 1.6, 0xb8c0d8),
+      B(0, 0.12, 0, 1.3, 0.12, 1.3, 0xdfe6f5),
+      BR(0, 0.0, 0, 1.6, 0.14, 1.6, 0xb8c0d8, 0.785),           // rotated copies make the disc octagonal
+      BR(0, 0.12, 0, 1.3, 0.12, 1.3, 0xdfe6f5, 0.785),
+      B(0, 0.06, 0, 1.64, 0.04, 1.64, CYAN),                    // neon belt
+      BR(0, 0.06, 0, 1.64, 0.04, 1.64, PINK, 0.785),
+      B(0, 0.22, 0, 0.8, 0.1, 0.8, 0xaab2c6),
+      B(0, 0.34, 0, 0.6, 0.16, 0.6, 0x8fefff),                   // dome
+      B(0, 0.44, 0, 0.36, 0.08, 0.36, 0xd8fbff),
+      B(0, 0.34, 0, 0.18, 0.16, 0.18, 0x6ee06a),                 // alien pilot
+      B(0, 0.34, 0.095, 0.12, 0.05, 0.02, 0x111111)
     ];
-    for (var u = 0; u < 4; u++) {
-      j.push(B(0.2 + u * 0.18, 0.08, 0.2, 0.06, 0.1, 0.04, 0xffffff));
-      j.push(B(0.2 + u * 0.18, 0.08, -0.2, 0.06, 0.1, 0.04, 0xffffff));
+    var lc = [RED, 0xffe14d, GREEN, 0x4f8bff];
+    for (var i = 0; i < 8; i++) {
+      var a = i / 8 * Math.PI * 2;
+      o.push(B(Math.cos(a) * 0.72, 0.03, Math.sin(a) * 0.72, 0.1, 0.1, 0.1, lc[i % 4]));
     }
-    jaw.add(Utils.voxelMesh(j));
-    g.add(jaw);
-    return { group: g, jaw: jaw, length: L, headLen: headLen };
+    g.add(Utils.voxelMesh(o, { material: neonMaterial() }));
+    var geo = new THREE.CylinderGeometry(0.28, 0.85, 1, 20, 1, true);
+    geo.translate(0, -0.5, 0);
+    var beam = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color: 0x9ff6ff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false
+    }));
+    beam.position.y = -0.12;
+    beam.visible = false;
+    beam.renderOrder = 3;
+    g.add(beam);
+    return { group: g, beam: beam };
+  }
+
+  // ===================================================================== neon
+  // Props use this material: like the normal voxel material, but bright, saturated
+  // colours (cyan, magenta, lime, orange...) are self-lit, so they glow like neon
+  // tubes against the dark world whatever the lighting. uNeon pulses the glow.
+  var neonU = { value: 1 };
+  var _neonMat = null;
+  function neonMaterial() {
+    if (!_neonMat) {
+      _neonMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      _neonMat.onBeforeCompile = function (shader) {
+        shader.uniforms.uNeon = neonU;
+        shader.fragmentShader = 'uniform float uNeon;\n' + shader.fragmentShader.replace('#include <emissivemap_fragment>',
+          '#include <emissivemap_fragment>\n' +
+          'float nLum = max(vColor.r, max(vColor.g, vColor.b));\n' +
+          'float nSat = nLum - min(vColor.r, min(vColor.g, vColor.b));\n' +
+          'totalEmissiveRadiance += vColor * (smoothstep(0.42, 0.8, nLum) * smoothstep(0.22, 0.5, nSat) * 1.05 + 0.06) * uNeon;');
+      };
+      _neonMat.customProgramCacheKey = function () { return 'neon2'; };
+      _neonMat.__shared = true;
+    }
+    return _neonMat;
+  }
+
+  // a soft additive glow ribbon (engine trails, hover pools)
+  var _glowTex = null;
+  function glowTexture() {
+    if (!_glowTex) {
+      var cv = document.createElement('canvas');
+      cv.width = 128; cv.height = 32;
+      var c = cv.getContext('2d');
+      var g = c.createLinearGradient(0, 0, 128, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.7, 'rgba(255,255,255,0.55)');
+      g.addColorStop(1, 'rgba(255,255,255,1)');
+      c.fillStyle = g; c.fillRect(0, 0, 128, 32);
+      c.globalCompositeOperation = 'destination-in';
+      var v = c.createLinearGradient(0, 0, 0, 32);
+      v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(0.5, 'rgba(0,0,0,1)'); v.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = v; c.fillRect(0, 0, 128, 32);
+      _glowTex = new THREE.CanvasTexture(cv);
+    }
+    return _glowTex;
+  }
+  var _trailGeo = null, _trailMats = {};
+  function trailMat(color) {
+    if (!_trailGeo) {
+      _trailGeo = new THREE.PlaneGeometry(1, 1);
+      _trailGeo.__shared = true;
+    }
+    if (!_trailMats[color]) {
+      var m = new THREE.MeshBasicMaterial({ map: glowTexture(), color: color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide, opacity: 0.85 });
+      m.__shared = true;
+      _trailMats[color] = m;
+    }
+    return _trailMats[color];
+  }
+  // every ship gets a glowing engine trail behind it and a pool of light on the bridge below
+  function decorateShip(mesh, kind, color, len) {
+    var mat = trailMat(color);
+    var trailLen = 2.2 + len * 0.45;
+    var flat = new THREE.Mesh(_trailGeo, mat);
+    flat.rotation.x = -Math.PI / 2;
+    flat.scale.set(trailLen, 0.42, 1);
+    flat.position.set(-len / 2 - trailLen / 2 + 0.1, 0.42, 0);
+    flat.renderOrder = 2;
+    var tall = new THREE.Mesh(_trailGeo, mat);
+    tall.scale.set(trailLen, 0.3, 1);
+    tall.position.set(-len / 2 - trailLen / 2 + 0.1, 0.42, 0);
+    tall.renderOrder = 2;
+    var pool = new THREE.Mesh(_trailGeo, mat);
+    pool.rotation.x = -Math.PI / 2;
+    pool.scale.set(len * 1.1 + 0.6, 0.8, 1);
+    pool.position.set(-0.1, -0.06, 0);       // (the ship hovers ~0.1 above the lane, so this lies on it)
+    pool.renderOrder = 1;
+    mesh.add(flat); mesh.add(tall); mesh.add(pool);
+  }
+
+  // hologram portal: two neon pylons with light beams marking the border
+  function neonGate() {
+    var g = new THREE.Group();
+    [-1, 1].forEach(function (s) {
+      var m = Utils.voxelMesh([
+        B(0, 0.2, 0, 0.62, 0.4, 0.62, 0x1b1e33),
+        B(0, 1.2, 0, 0.36, 1.6, 0.36, 0x2a2e55),
+        B(0, 0.5, 0, 0.46, 0.06, 0.46, CYAN),
+        B(0, 1.1, 0, 0.46, 0.06, 0.46, PINK),
+        B(0, 1.7, 0, 0.46, 0.06, 0.46, CYAN),
+        B(0, 2.1, 0, 0.6, 0.18, 0.6, 0x1b1e33),
+        B(0, 2.3, 0, 0.26, 0.26, 0.26, PINK)
+      ], { material: neonMaterial() });
+      m.position.x = s * (CONFIG.PLAY_HALF + 1.6);
+      g.add(m);
+      var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, 7, 10, 1, true), new THREE.MeshBasicMaterial({
+        color: s > 0 ? PINK : CYAN, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide
+      }));
+      beam.position.set(m.position.x, 3.5, 0);
+      beam.renderOrder = 3;
+      g.add(beam);
+    });
+    return g;
+  }
+
+  // wrecked hull plates: the stepping stones over a black hole
+  function hullPlate(width) {
+    return H.cachedMesh('plat:space:' + width, function () {
+      var o = [];
+      o.push(B(0, 0, 0, width, 0.3, 0.78, 0x3d4470));
+      o.push(B(0, 0.165, 0, width - 0.1, 0.03, 0.66, 0x5a64a0));
+      o.push(B(0, -0.17, 0, width - 0.3, 0.05, 0.5, CYAN));
+      o.push(B(0, 0.19, 0, width - 0.3, 0.01, 0.04, 0x7df3ff));
+      o.push(B(-width / 2 + 0.2, 0.19, 0.22, 0.12, 0.02, 0.12, PINK));
+      o.push(B(width / 2 - 0.2, 0.19, -0.22, 0.12, 0.02, 0.12, PINK));
+      o.push(B(width / 2 + 0.01, 0, 0, 0.04, 0.32, 0.8, 0x7480a6));
+      o.push(B(-width / 2 - 0.01, 0, 0, 0.04, 0.32, 0.8, 0x7480a6));
+      o.push(B(0.1, 0.2, 0.3, 0.3, 0.04, 0.08, ORANGE));            // exposed wiring
+      o.push(B(-0.3, -0.02, -0.4, 0.5, 0.16, 0.1, 0x59607f));       // torn edge
+      return o;
+    }, neonMaterial());
   }
 
   Models.registerBiome('space', {
     obstacles: OBSTACLES, border: border, flower: starBloom, rock: moonRock, bush: dome,
     vehicles: V, vehicleColors: SHIP_COLORS,
     logBoxes: asteroidBoxes, pad: rockPadMesh, turtleBoxes: satellites,
-    locoBoxes: maglevLoco, carBoxes: maglevCar, carColors: TRAIN_COLORS,
-    croc: voidWorm
+    locoBoxes: cometHead, carBoxes: cometTail, carColors: FIRE,
+    croc: laserAsteroid, material: neonMaterial(), platform: hullPlate, gate: neonGate,
+    signalStyle: { base: 0x1b1e33, pole: 0xaab2c6, housing: 0x1b1e33, cap: 0x00e5ff, extra: [B(0, 1.94, 0, 0.05, 0.3, 0.05, 0xaab2c6), B(0, 2.12, 0, 0.12, 0.12, 0.12, 0xff2d55)] },
+    decorate: decorateShip,
+    warm: function () { return Utils.voxelMesh([B(0, 0.1, 0, 0.1, 0.2, 0.1, CYAN)], { material: neonMaterial() }); }
   });
+
+  return { neonMaterial: neonMaterial, buildUfo: buildUfo, setPulse: function (v) { neonU.value = v; } };
 })();

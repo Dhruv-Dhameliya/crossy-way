@@ -14,7 +14,7 @@ A fast, colourful hopping game. Guide a little chicken across endless roads, riv
 - **Chasms.** Some lanes are a bottomless drop with nothing but moving platforms to cross them. Time your hop — miss and you fall.
 - **Don't dawdle.** Stand still and you'll hear the **eagle screech**; 3 seconds later it swoops in. Reach a new row to send it away.
 
-You lose if you get hit, fall in the water or a chasm, get eaten by a crocodile, or the eagle gets you.
+You lose if you get hit, fall in the water or a chasm, get eaten by a crocodile (or zapped by a laser in space), or the eagle (or a UFO) gets you.
 
 ## Difficulty
 
@@ -66,7 +66,20 @@ Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, 
 
 ## Biomes 🚀
 
-The world has more than one look. Run far enough in the **Forest** and a portal carries you into **Space**: the roads become glass walkways with **spaceships** flying over them (fighters, freighters, liners, saucers, asteroid miners, even a flying ice-cream UFO), the rivers become **empty space** that you cross on **broken asteroid chunks** and drifting **satellites** (which power down!), crocodiles become **void worms**, and chasms become **black holes** crossed on wrecked hull plates. Rockets, crystals, monoliths, stranded astronauts, habitat domes, supply crates and little aliens block your way, and your chicken puts on an **astronaut helmet**. It's the same game — only the design and the obstacles change — and the sky fills with drifting dust and meteors (rain becomes a **meteor shower**). In Settings → World you can pick **Auto** (Forest → Space → Forest…), or lock **Forest** or **Space**.
+The world has more than one look. Run far enough in the **Forest** and a portal carries you into **Space** — a neon, futuristic version of the same game. Everything is replaced by something that belongs in space, with the same rules:
+
+| Forest | Space |
+| --- | --- |
+| Roads and cars | Glowing **light-bridges** with **spaceships** flying over them — fighters, freighters, liners, saucers, asteroid miners, even a flying ice-cream UFO |
+| Rivers, logs, lily pads | **Empty space** crossed on **broken asteroid chunks** and drifting rocks |
+| Turtles | **Satellites** that shake, then power down |
+| Railway and trains (with a signal) | A **comet** streaking across a scorched lane — beacons flash and an alarm sounds first |
+| Crocodile logs | **Orbital laser strikes**: a marked patch on the asteroid charges up, then gets blasted |
+| Chasm and moving platforms | **Black hole** crossed on wrecked hull plates |
+| Trees, hay bales, scarecrows, mushrooms… | **Rockets, neon crystals, monoliths, stranded astronauts, habitat domes, little aliens**… |
+| The eagle | A **UFO** with a tractor beam (you hear a warble 3 seconds before) |
+
+The whole place glows: a neon grid floor that pulses, ships with glowing engine trails, hologram portals, neon dust and meteors (rain becomes a **meteor shower**), a neon-lit screen, a synthwave soundtrack — and your chicken puts on an **astronaut helmet** with a glowing halo. In Settings → World you can pick **Auto** (Forest → Space → Forest…), or lock **Forest** or **Space**.
 
 ## Share your score 📸
 

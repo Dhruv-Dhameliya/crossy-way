@@ -1,6 +1,8 @@
 // Procedural endless world: bands of grass / road / river / railway lanes with
 // their trees, traffic, logs, lily pads, trains and coins. Every row belongs to a
-// biome (forest, space...) that only changes how it looks. Extra hazards: sliding
+// biome. The Forest is handled right here; any other biome only plugs in through
+// the optional hooks of its theme (Biome.theme(row.biome), see config.js), so this
+// file never mentions a particular biome. Extra hazards: sliding
 // ice lanes, crocodile logs and moving platforms over a chasm.
 function World(scene) {
   this.scene = scene;
@@ -199,7 +201,7 @@ World.prototype.populateGrass = function (row, z, p) {
       }
     });
   }
-  if (boxes.length) row.group.add(Utils.voxelMesh(boxes, { material: row.biome === 'space' ? Utils.voxelMaterial() : Models.sceneryMaterial() })); // trees sway in the wind (there is none in space)
+  if (boxes.length) row.group.add(Utils.voxelMesh(boxes, { material: Biome.theme(row.biome).sceneryMaterial ? Biome.theme(row.biome).sceneryMaterial() : Models.sceneryMaterial() })); // trees sway in the wind
 
   if (z > 0) {
     var r = Math.random();
@@ -355,9 +357,12 @@ World.prototype.laneStep = function (row, dt) {
       v.mesh.position.x = v.x;
       // a little suspension bounce and body roll, livelier the faster they go
       var tm = this.time, sp = Math.min(1.5, v.cur / 4);
-      var hover = row.biome === 'space';   // ships float: a slow bob and roll instead of road bumps
-      v.mesh.position.y = row.top + (hover ? 0.1 + Math.sin(tm * 2.4 + v.ph) * 0.05 : Math.sin(tm * (7 + v.cur * 0.8) + v.ph) * 0.012 * sp);
-      v.mesh.rotation.z = hover ? Math.sin(tm * 1.7 + v.ph * 1.7) * 0.03 : Math.sin(tm * (5 + v.cur * 0.5) + v.ph * 1.7) * 0.014 * sp;
+      var Th = Biome.theme(row.biome);
+      if (Th.vehicleBob) Th.vehicleBob(v, row, tm);   // e.g. floating spaceships
+      else {
+        v.mesh.position.y = row.top + Math.sin(tm * (7 + v.cur * 0.8) + v.ph) * 0.012 * sp;
+        v.mesh.rotation.z = Math.sin(tm * (5 + v.cur * 0.5) + v.ph * 1.7) * 0.014 * sp;
+      }
     }
   }
   if (frozen) return; // no new traffic while time is frozen
@@ -451,13 +456,13 @@ World.prototype.populateWater = function (row, dir, p, band) {
       crocLeft--;
       var croc = Models.buildCroc(lengths[j], row.biome);
       croc.group.position.set(centers[j], -0.12, 0);
-      croc.group.rotation.y = dir > 0 ? 0 : Math.PI;
+      croc.group.rotation.y = dir > 0 ? 0 : Math.PI;   // (a laser strike is symmetrical)
       row.group.add(croc.group);
       var cyc = Utils.randRange(3.4, 4.6);
       entry = {
         mesh: croc.group, x: centers[j], halfWidth: lengths[j] / 2, speed: speed, direction: dir,
         baseY: -0.12, top: 0.05, dip: 0, bob: 0, phase: Math.random() * 6.28,
-        croc: true, jaw: croc.jaw, cycle: cyc, t0: Utils.randRange(0, cyc), open: 0, snapped: false
+        croc: true, jaw: croc.jaw, fx: croc.fx, onFire: croc.onFire, onKill: croc.onKill, cycle: cyc, t0: Utils.randRange(0, cyc), open: 0, snapped: false
       };
     } else {
       var mesh = Models.buildLog(lengths[j], row.biome);
@@ -556,14 +561,14 @@ World.prototype.populateRail = function (row) {
   var PH = CONFIG.PLAY_HALF;
   var vh = CONFIG.GROUND_VISUAL_HALF;
   var railColor = Biome.colors(row.biome).rail;
-  row.group.add(Utils.voxelMesh([
+  if (!Biome.theme(row.biome).noRails) row.group.add(Utils.voxelMesh([
     { x: 0, y: row.top + 0.04, z: 0.28, w: vh * 2, h: 0.07, d: 0.07, color: railColor },
     { x: 0, y: row.top + 0.04, z: -0.28, w: vh * 2, h: 0.07, d: 0.07, color: railColor }
   ], { castShadow: false }));
 
-  var sig = Models.buildSignal();
+  var sig = Models.buildSignal(row.biome);
   sig.group.position.set(-PH - 1.4, row.top, -0.5); // fixed in the world: signals never move
-  var sig2 = Models.buildSignal();
+  var sig2 = Models.buildSignal(row.biome);
   sig2.group.position.set(PH + 1.4, row.top, -0.5);
   row.group.add(sig.group);
   row.group.add(sig2.group);
@@ -693,10 +698,7 @@ World.prototype.update = function (dt, centerZ, playerZ, budget) {
         l.mesh.position.y = l.baseY + l.bob - l.dip - (l.sink || 0) + (l.wob || 0);
         l.curTop = l.top + l.bob - l.dip - (l.sink || 0) + (l.wob || 0); // what the chicken stands on
         if (l.pad || l.turtle || l.platform) l.mesh.rotation.z = Math.sin(time * 1.6 + l.phase) * 0.02;
-        else if (row.biome === 'space' && !l.croc) { // drifting space rock: a slow lazy roll
-          l.mesh.rotation.z = Math.sin(time * 0.7 + l.phase) * 0.035;
-          l.mesh.rotation.x = Math.sin(time * 0.5 + l.phase * 1.3) * 0.02;
-        }
+        else if (!l.croc && Biome.theme(row.biome).logSway) Biome.theme(row.biome).logSway(l, time);
       }
     } else if (row.type === T.RAIL) {
       self.updateTrain(row, dt, vol);
@@ -718,7 +720,7 @@ World.prototype.updateTurtle = function (row, l, dt, time) {
   l.submerged = l.sink > 0.3;
   if (tt >= diveStart && tt < riseStart && !l.bubbled) {
     l.bubbled = true;
-    Particles.burst(l.x, row.top + 0.02, row.z, { colors: row.biome === 'space' ? [0xffffff, 0x7df3ff, 0xff8a3d] : [0xffffff, 0xcfeeff, 0x9be0ff], count: 8, speed: 1.4, up: 2.2, size: 0.09, life: 0.6, gravity: 2, spread: l.halfWidth, floor: row.top });
+    Particles.burst(l.x, row.top + 0.02, row.z, { colors: Biome.theme(row.biome).diveColors || [0xffffff, 0xcfeeff, 0x9be0ff], count: 8, speed: 1.4, up: 2.2, size: 0.09, life: 0.6, gravity: 2, spread: l.halfWidth, floor: row.top });
   } else if (tt < warnStart) l.bubbled = false;
 };
 
@@ -732,10 +734,13 @@ World.prototype.updateCroc = function (row, l, dt, time, vol) {
   else if (tt >= warn && tt < snap) target = 0.32 + (tt - warn) / (snap - warn) * 0.18;
   else if (tt >= snap && tt < shut) target = 1;
   l.open += (target - l.open) * (1 - Math.exp(-dt * (target === 0 && l.chomp > 0 ? 30 : 13)));
-  l.jaw.rotation.z = -l.open * 0.78;
+  if (l.fx) l.fx(l.open); else l.jaw.rotation.z = -l.open * 0.78;
   if (tt >= snap && tt < shut && !l.snapped) {
     l.snapped = true;
-    if (vol > 0 && GameAudio && GameAudio.crocGrowl) GameAudio.crocGrowl(vol);
+    if (vol > 0) {
+      if (l.onFire) l.onFire(vol);
+      else if (GameAudio && GameAudio.crocGrowl) GameAudio.crocGrowl(vol);
+    }
   } else if (tt < warn) l.snapped = false;
 };
 
@@ -755,7 +760,7 @@ World.prototype.checkCrocHit = function (x, z) {
 // What happens to a chicken that ends up in this water lane: drown, or fall into the chasm.
 World.prototype.drownType = function (z) {
   var row = this.rows.get(z);
-  return row && (row.void || row.biome === 'space') ? 'fall' : 'drown';
+  return row && (row.void || Biome.theme(row.biome).fallsInWater) ? 'fall' : 'drown';
 };
 
 World.prototype.isIce = function (x, z) {
@@ -828,8 +833,17 @@ World.prototype.blast = function (px, pz, radius) {
 // A train's timeline: the whistle and the signal bells start about 2 s before
 // it appears, and it needs ~2 s more to reach the playing field - so you get
 // a 3-4 second heads-up.
+// The Forest's railway sounds; a biome theme can replace them (theme.trainAudio).
+var FOREST_TRAIN_AUDIO = {
+  warn: function (v) { GameAudio.trainWhistle(v); },
+  ping: function (b, v) { GameAudio.bell(b, v); },
+  toot: function (v) { GameAudio.trainToot(v); },
+  pass: function (v) { GameAudio.trainPass(v); }
+};
+
 World.prototype.updateTrain = function (row, dt, vol) {
   var t = row.train;
+  var A = Biome.theme(row.biome).trainAudio || FOREST_TRAIN_AUDIO;
   if (this.frozen) return; // Time Freeze: the whole railway holds its breath
   t.timer -= dt;
   if (t.phase === 'idle') {
@@ -839,7 +853,7 @@ World.prototype.updateTrain = function (row, dt, vol) {
       t.warnPulse = 0;
       t.ding = -1;
       t.toot = false;
-      if (vol > 0 && GameAudio) GameAudio.trainWhistle(vol);
+      if (vol > 0 && GameAudio) A.warn(vol);
     }
   } else if (t.phase === 'warning') {
     t.warnPulse += dt;
@@ -848,11 +862,11 @@ World.prototype.updateTrain = function (row, dt, vol) {
     this.setSignals(t, 'red', blink); // flashing red: a train is coming
     if (step !== t.ding) {
       t.ding = step;
-      if (vol > 0 && GameAudio) GameAudio.bell(blink, vol);
+      if (vol > 0 && GameAudio) A.ping(blink, vol);
     }
     if (!t.toot && t.warnPulse > 1.5) {
       t.toot = true;
-      if (vol > 0 && GameAudio) GameAudio.trainToot(vol);
+      if (vol > 0 && GameAudio) A.toot(vol);
     }
     if (t.timer <= 0) {
       t.phase = 'crossing';
@@ -864,14 +878,14 @@ World.prototype.updateTrain = function (row, dt, vol) {
     this.setSignals(t, 'red', flash);
     if (vol > 0 && GameAudio && Math.floor(this.time * 3) !== t.ding) {
       t.ding = Math.floor(this.time * 3);
-      GameAudio.bell(flash, vol * 0.7);
+      A.ping(flash, vol * 0.7);
     }
     t.x += t.direction * t.speed * dt;
     t.mesh.position.x = t.x;
     var ls = this.listener;
     if (!t.passed && ls && vol > 0 && (t.direction > 0 ? t.x > ls.x - 8 : t.x < ls.x + 8)) {
       t.passed = true;
-      GameAudio.trainPass(vol);
+      A.pass(vol);
     }
     var edge = CONFIG.LANE_HALF + 4;
     var gone = t.direction > 0 ? t.x - t.length > edge : t.x + t.length < -edge;

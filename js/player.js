@@ -4,6 +4,9 @@
 function Player(scene) {
   this.scene = scene;
   this.group = new THREE.Group();
+  this.themeName = 'forest';
+  this.themeSuit = null;
+  this.shadowBase = 0.3;
   this.buildModel();
   this.scene.add(this.group);
 
@@ -31,6 +34,8 @@ function Player(scene) {
   this.scene.add(this.eagleShadow);
   this.onEagleGrab = null;
   this.suit = false;
+  // A biome theme can replace the eagle with its own attacker (theme.attack).
+  this.attackTheme = null;
 
   this.deathVelocity = new THREE.Vector3();
   this.onCoin = null;
@@ -102,10 +107,33 @@ Player.prototype.setGhost = function (on) {
   if (!on) this.ghostMats.forEach(function (m) { m.opacity = 0.4; });
 };
 
-// Astronaut helmet (Space biome).
-Player.prototype.setSuit = function (on) {
-  this.suit = !!on;
-  if (this.helmet) this.helmet.visible = this.suit;
+// The theme of the biome the chicken stands in: it may add a suit (e.g. a helmet)
+// and restyle the blob shadow (e.g. a neon glow). The Forest adds nothing.
+Player.prototype.setTheme = function (name) {
+  this.themeName = name;
+  this.refreshTheme();
+};
+
+Player.prototype.refreshTheme = function () {
+  var T = Biome.theme(this.themeName);
+  if (this.themeSuit && this.bodyGroup) { this.bodyGroup.remove(this.themeSuit); Utils.disposeObject3D(this.themeSuit); }
+  this.themeSuit = null;
+  if (T.suit && this.bodyGroup) {
+    this.themeSuit = T.suit();
+    this.themeSuit.traverse(function (o) { if (o.isMesh) o.castShadow = false; });
+    this.bodyGroup.add(this.themeSuit);
+  }
+  var glow = T.shadowGlow;
+  this.shadow.material.color.setHex(glow ? glow.color : 0x000000);
+  this.shadow.material.blending = glow ? THREE.AdditiveBlending : THREE.NormalBlending;
+  this.shadow.material.needsUpdate = true;
+  this.shadowBase = glow ? glow.opacity : 0.3;
+};
+
+// The theme of the lane at row z.
+Player.prototype.themeAt = function (world, z) {
+  var row = world && world.getRow(Math.round(z));
+  return Biome.theme(row ? row.biome : 'forest');
 };
 
 Player.prototype.setShield = function (on) {
@@ -165,25 +193,11 @@ Player.prototype.buildModel = function () {
   this.wingR.position.set(0.295, 0.45, -0.02);
   body.add(this.wingR);
 
-  // space helmet: a see-through bubble, only shown in the Space biome
-  var helmet = new THREE.Group();
-  var glass = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.66, 0.82), new THREE.MeshLambertMaterial({
-    color: 0xbdf4ff, transparent: true, opacity: 0.26, depthWrite: false
-  }));
-  glass.position.set(0, 0.74, 0.1);
-  helmet.add(glass);
-  helmet.add(Utils.voxelMesh([
-    { x: 0, y: 0.45, z: 0.02, w: 0.64, h: 0.07, d: 0.62, color: 0xdfe6f5 },
-    { x: 0, y: 0.45, z: 0.02, w: 0.66, h: 0.025, d: 0.64, color: 0x4de8ff }
-  ], { castShadow: false }));
-  helmet.visible = !!this.suit;
-  body.add(helmet);
-  this.helmet = helmet;
-
   body.scale.setScalar(CONFIG.CHICKEN_SCALE);
   body.traverse(function (o) { if (o.isMesh) { o.castShadow = true; } });
   this.bodyGroup = body;
   this.group.add(body);
+  if (this.shadow) this.refreshTheme();   // re-apply the theme's suit after a new look
 };
 
 // Swap in the skin / outfits chosen in the shop.
@@ -237,6 +251,8 @@ Player.prototype.reset = function () {
   this.eaglePhaseT = 0;
   this.eagle.visible = false;
   this.eagleShadow.visible = false;
+  if (this.attackTheme && this.attackTheme.reset) this.attackTheme.reset(this);
+  this.attackTheme = null;
   this.eagleParts.legL.rotation.x = this.eagleParts.legR.rotation.x = -0.9;
   this.slideLeft = 0;
   this.hopSlide = false;
@@ -314,7 +330,7 @@ Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
     Particles.burst(startX, 0.06, startZ, { colors: [0xffffff, 0xcdeffa, 0x9fe9ff], count: 3, speed: 1.2, up: 0.9, size: 0.08, life: 0.35, gravity: 2, spread: 0.25, floor: 0 });
     if (GameAudio && GameAudio.slide) GameAudio.slide();
   } else {
-    if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ);
+    if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ, Biome.theme(r0.biome).puffColors);
     if (GameAudio) { if (leap) GameAudio.jump(leap); else GameAudio.hop(); }
   }
 };
@@ -496,7 +512,7 @@ Player.prototype.update = function (dt, world) {
   var lift = Utils.clamp(this.air / 0.6, 0, 1);
   this.shadow.position.set(this.x + offsetX, this.y - this.air + 0.014, this.z + offsetZ);
   this.shadow.scale.setScalar(CONFIG.CHICKEN_SCALE * (1.15 - lift * 0.5));
-  this.shadow.material.opacity = 0.3 * (1 - lift * 0.65);
+  this.shadow.material.opacity = (this.shadowBase || 0.3) * (1 - lift * 0.65);
 
   var jr = this.jumpRing;
   jr.visible = this.jumpLevel > 0;
@@ -517,7 +533,7 @@ Player.prototype.onLanded = function (world) {
     if (log) {
       this.onLog = log;
       log.dip = 0.11;
-      if (log.pad) Particles.puff(this.x, log.top, this.z);
+      if (log.pad) Particles.puff(this.x, log.top, this.z, Biome.theme(row.biome).puffColors);
       Particles.ring(this.x, (log.curTop !== undefined ? log.curTop : log.top) + 0.01, this.z, log.platform ? 0xffd9a8 : 0xdff6ff, 1.2);
     } else {
       this.startDeath(world.drownType(Math.round(this.z)), world);
@@ -525,7 +541,7 @@ Player.prototype.onLanded = function (world) {
     }
   } else {
     this.onLog = null;
-    if (row.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(this.x, 0.02, this.z);
+    if (row.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(this.x, 0.02, this.z, Biome.theme(row.biome).puffColors);
   }
   var coin = world.tryCollectCoin(this.x, this.z);
   if (coin) {
@@ -598,13 +614,20 @@ Player.prototype.startDeath = function (type, world, hitBy) {
   } else if (type === 'fall') {
     // into the chasm: no splash, just a long drop
     if (GameAudio && GameAudio.fall) GameAudio.fall();
-    var vc = world && world.getRow(this.z) && world.getRow(this.z).biome === 'space' ? [0x8f6bff, 0x4de8ff, 0xffffff] : [0xff8a3d, 0xffd23f, 0x555555];
+    var vc = this.themeAt(world, this.z).fallColors || [0xff8a3d, 0xffd23f, 0x555555];
     Particles.burst(this.x, this.y + 0.1, this.z, { colors: vc, count: 12, speed: 2, up: 3, size: 0.1, life: 0.7, gravity: 6, spread: 0.3, floor: this.y - 1 });
   } else if (type === 'croc') {
     this.deathCroc = hitBy || null;
     if (hitBy) hitBy.chomp = 0.8;                 // the croc snaps shut on its prey
-    if (GameAudio && GameAudio.chomp) GameAudio.chomp();
-    Particles.feathers(this.x, this.y + 0.5, this.z, 14);
+    if (hitBy && hitBy.onKill) {                  // a biome's own killer (e.g. a laser strike)
+      hitBy.onKill(this);
+    } else {
+      if (GameAudio && GameAudio.chomp) GameAudio.chomp();
+      Particles.feathers(this.x, this.y + 0.5, this.z, 14);
+    }
+  } else if (type === 'eagle' && this.themeAt(world, this.z).attack) {
+    this.attackTheme = this.themeAt(world, this.z).attack;   // e.g. a UFO instead of the eagle
+    this.attackTheme.begin(this);
   } else if (type === 'eagle') {
     if (GameAudio && GameAudio.eagleAttack) GameAudio.eagleAttack(); else if (GameAudio) GameAudio.screech();
     var side = Math.random() < 0.5 ? -1 : 1;
@@ -659,9 +682,9 @@ Player.prototype.updateDeath = function (dt) {
     this.group.scale.set(cs * (1 + 0.2 * Math.sin(t * 40)), cs, cs);
     this.group.rotation.z = Math.sin(t * 30) * 0.3 * (1 - ck);
   } else if (this.deathType === 'eagle') {
-    this.updateEagleDeath(dt);
+    if (this.attackTheme) this.attackTheme.update(this, dt); else this.updateEagleDeath(dt);
   }
-  var duration = this.deathType === 'eagle' ? 2.3 : this.deathType === 'drown' ? 0.75 : this.deathType === 'fall' ? 0.85 : 0.9;
+  var duration = this.deathType === 'eagle' ? (this.attackTheme ? this.attackTheme.duration : 2.3) : this.deathType === 'drown' ? 0.75 : this.deathType === 'fall' ? 0.85 : 0.9;
   if (t > duration) this.alive = false;
 };
 

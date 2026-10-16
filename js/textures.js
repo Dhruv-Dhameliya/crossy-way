@@ -1,26 +1,43 @@
 // Procedural canvas textures for the lane surfaces. Lane dashes, rail
 // sleepers, grass grain and water ripples are painted into small tileable
 // textures shared by every row of that kind, so a lane is a single mesh.
-// Every biome (forest, space...) has its own palette; a lane can also be a
+// Every biome has its own palette (and may paint its own textures); a lane can also be a
 // variant: frozen "ice" (a grass lane) or a dark "void" (a water-type lane).
 var Textures = (function () {
   var materialCache = {};
   var geometryCache = {};
   var waterTextures = [];
+  var glowMaterials = [];   // lane materials with a glow layer (themes can animate them)
 
   function hexCss(hex) {
     return 'rgb(' + ((hex >> 16) & 255) + ',' + ((hex >> 8) & 255) + ',' + (hex & 255) + ')';
   }
   function shadeCss(hex, amt) { return hexCss(Utils.shade(hex, amt)); }
 
-  function makeTexture(w, h, paint) {
+  // withGlow: also paint a second "glow" layer (black = dark, bright = shines by
+  // itself); it becomes the emissive map of the lane material (neon lines, stars).
+  function makeTexture(w, h, paint, withGlow) {
     var cv = document.createElement('canvas');
     cv.width = w;
     cv.height = h;
-    paint(cv.getContext('2d'), w, h);
+    var gcv = null, gctx = null;
+    if (withGlow) {
+      gcv = document.createElement('canvas');
+      gcv.width = w;
+      gcv.height = h;
+      gctx = gcv.getContext('2d');
+      gctx.fillStyle = '#000';
+      gctx.fillRect(0, 0, w, h);
+    }
+    paint(cv.getContext('2d'), w, h, gctx);
     var tex = new THREE.CanvasTexture(cv);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.anisotropy = 4;
+    if (gcv) {
+      var gt = new THREE.CanvasTexture(gcv);
+      gt.wrapS = gt.wrapT = THREE.RepeatWrapping;
+      tex.glowMap = gt;
+    }
     return tex;
   }
 
@@ -39,102 +56,19 @@ var Textures = (function () {
     }
   }
 
-  // Tiny stars. A texel is twice as wide as it is tall once stretched over the
-  // lane, so each star is drawn s wide and 2s tall to come out square.
-  function stars(ctx, w, h, seed, count, alpha) {
-    var r = rng(seed);
-    for (var i = 0; i < count; i++) {
-      var s = r() < 0.12 ? 3 : r() < 0.4 ? 2 : 1;
-      var warm = r();
-      ctx.fillStyle = warm < 0.18 ? 'rgba(143,244,255,' : warm < 0.3 ? 'rgba(255,190,240,' : 'rgba(255,255,255,';
-      ctx.fillStyle += (alpha * (0.45 + r() * 0.55)).toFixed(2) + ')';
-      ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), s, s * 2);
-    }
-  }
-
-  // Empty space instead of a river: deep blue-black, nebula haze, drifting stars.
-  function spaceVoidTexture(base) {
-    var tex = makeTexture(128, 128, function (ctx, w, h) {
-      ctx.fillStyle = hexCss(base);
-      ctx.fillRect(0, 0, w, h);
-      var r = rng(41 + (base & 255));
-      for (var i = 0; i < 3; i++) {                       // nebula wisps
-        var cx = r() * w, cy = r() * h, rad = 30 + r() * 30;
-        var g = ctx.createRadialGradient(cx, cy, 2, cx, cy, rad);
-        var col = i % 2 ? '120,70,230' : '40,120,220';
-        g.addColorStop(0, 'rgba(' + col + ',0.22)');
-        g.addColorStop(1, 'rgba(' + col + ',0)');
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, w, h);
-      }
-      stars(ctx, w, h, 77 + (base & 255), 46, 0.95);
-      // a couple of bright twinkles
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      for (var k = 0; k < 2; k++) {
-        var sx = Math.floor(r() * (w - 8)) + 4, sy = Math.floor(r() * (h - 8)) + 4;
-        ctx.fillRect(sx - 3, sy, 7, 2);
-        ctx.fillRect(sx, sy - 3, 2, 7);
-      }
-    });
-    waterTextures.push(tex);
-    return tex;
-  }
-
-  // The chasm lane in space: a black hole's glowing accretion swirl.
-  function blackHoleTexture(base, accent) {
-    var tex = makeTexture(128, 128, function (ctx, w, h) {
-      ctx.fillStyle = hexCss(base);
-      ctx.fillRect(0, 0, w, h);
-      ctx.strokeStyle = hexCss(accent);
-      ctx.lineWidth = 3;
-      for (var i = 0; i < 4; i++) {
-        ctx.globalAlpha = 0.5 - i * 0.1;
-        ctx.beginPath();
-        ctx.ellipse(w / 2, h / 2, 54 - i * 12, 26 - i * 5, 0, 0.4 + i, 4.6 + i);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-      stars(ctx, w, h, 5 + (base & 255), 14, 0.7);
-    });
-    waterTextures.push(tex);
-    return tex;
-  }
-
-  // moon = true: add little craters
-  function grassTexture(base, moon) {
+  function grassTexture(base) {
     return makeTexture(64, 64, function (ctx, w, h) {
       ctx.fillStyle = hexCss(base);
       ctx.fillRect(0, 0, w, h);
       speckle(ctx, w, h, base, 26, 11 + (base & 255), 0.07);
-      if (moon) {
-        var r = rng(5 + (base & 255));
-        for (var i = 0; i < 3; i++) {
-          var cx = 8 + r() * 48, cy = 8 + r() * 48, rad = 3 + r() * 4;
-          ctx.fillStyle = shadeCss(base, -0.16);
-          ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = shadeCss(base, 0.1);
-          ctx.beginPath(); ctx.arc(cx - 1, cy - 1, rad * 0.6, 0, Math.PI * 2); ctx.fill();
-        }
-      }
     });
   }
 
-  // tech = true: panel seams like a space-station road
-  function roadTexture(base, line, edge, tech) {
+  function roadTexture(base, line, edge) {
     return makeTexture(128, 128, function (ctx, w, h) {
       ctx.fillStyle = hexCss(base);
       ctx.fillRect(0, 0, w, h);
-      if (tech) {
-        // a glass walkway: the stars shine through, with a faint panel grid
-        stars(ctx, w, h, 22 + (base & 255), 34, 0.55);
-        ctx.fillStyle = 'rgba(120,220,255,0.16)';
-        ctx.fillRect(0, 62, w, 2);
-        ctx.fillRect(63, 0, 2, h);
-        ctx.fillStyle = 'rgba(120,220,255,0.07)';
-        ctx.fillRect(0, 0, w, h / 2);
-      } else {
-        speckle(ctx, w, h, base, 50, 23 + (base & 255), 0.06);
-      }
+      speckle(ctx, w, h, base, 50, 23 + (base & 255), 0.06);
       if (edge) {
         // dashed divider on the near edge of the lane (shared with the lane in front)
         ctx.fillStyle = hexCss(line);
@@ -220,32 +154,38 @@ var Textures = (function () {
 
   // BoxGeometry material order: +x, -x, +y, -y, +z, -z
   // variant: undefined | 'ice' (on a grass lane) | 'void' (on a water-type lane)
+  // A biome theme may supply its own ground (theme.ground); returning null falls
+  // back to the normal textures below.
   function getGroundMaterials(type, parity, edge, biome, variant) {
     biome = biome || 'forest';
     var key = 'mat:' + biome + ':' + type + ':' + parity + ':' + (edge ? 1 : 0) + ':' + (variant || '');
     if (materialCache[key]) return materialCache[key];
     var C = Biome.colors(biome);
-    var space = biome === 'space';
     var tiles = CONFIG.GROUND_VISUAL_HALF * 2 + 1;
     var tex, side;
-    if (type === CONFIG.ROW_TYPES.GRASS && variant === 'ice') {
+    var T = Biome.theme(biome);
+    var custom = T.ground ? T.ground(kit, type, parity, edge, variant, tiles, C) : null;
+    if (custom) {
+      tex = custom.tex;
+      side = custom.side;
+    } else if (type === CONFIG.ROW_TYPES.GRASS && variant === 'ice') {
       tex = iceTexture(parity ? C.iceA : C.iceB);
       tex.repeat.set(tiles, 1);
       side = C.iceSide;
     } else if (type === CONFIG.ROW_TYPES.GRASS) {
-      tex = grassTexture(parity ? C.grassA : C.grassB, space);
+      tex = grassTexture(parity ? C.grassA : C.grassB);
       tex.repeat.set(tiles, 1);
       side = C.grassSide;
     } else if (type === CONFIG.ROW_TYPES.ROAD) {
-      tex = roadTexture(parity ? C.roadA : C.roadB, C.roadLine, edge, space);
+      tex = roadTexture(parity ? C.roadA : C.roadB, C.roadLine, edge);
       tex.repeat.set(tiles / 2, 1);
       side = C.roadSide;
     } else if (type === CONFIG.ROW_TYPES.WATER && variant === 'void') {
-      tex = space ? blackHoleTexture(parity ? C.voidA : C.voidB, C.voidAccent) : waterTexture(parity ? C.voidA : C.voidB, C.voidAccent);
+      tex = waterTexture(parity ? C.voidA : C.voidB, C.voidAccent);
       tex.repeat.set(tiles / 2, 1);
       side = C.voidSide;
     } else if (type === CONFIG.ROW_TYPES.WATER) {
-      tex = space ? spaceVoidTexture(parity ? C.waterA : C.waterB) : waterTexture(parity ? C.waterA : C.waterB);
+      tex = waterTexture(parity ? C.waterA : C.waterB);
       tex.repeat.set(tiles / 2, 1);
       side = C.waterSide;
     } else {
@@ -253,8 +193,12 @@ var Textures = (function () {
       tex.repeat.set(tiles, 1);
       side = C.railSide;
     }
-    var top = new THREE.MeshLambertMaterial({ map: tex });
+    // a texture with a glow layer shines by itself (neon lines, stars)
+    var top = tex.glowMap
+      ? new THREE.MeshLambertMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex.glowMap })
+      : new THREE.MeshLambertMaterial({ map: tex });
     top.__shared = true;
+    if (tex.glowMap) glowMaterials.push(top);
     var s = sideMat(side);
     var set = [s, s, top, s, s, s];
     materialCache[key] = set;
@@ -268,9 +212,17 @@ var Textures = (function () {
     }
   }
 
+  // Helpers a biome theme can use to paint its own lane textures.
+  var kit = {
+    makeTexture: makeTexture, rng: rng, speckle: speckle, hexCss: hexCss, shadeCss: shadeCss,
+    addWater: function (tex) { waterTextures.push(tex); return tex; }   // drifts like a river surface
+  };
+
   return {
     getGroundGeometry: getGroundGeometry,
     getGroundMaterials: getGroundMaterials,
-    update: update
+    update: update,
+    kit: kit,
+    glowMaterials: glowMaterials
   };
 })();

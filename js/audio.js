@@ -180,6 +180,8 @@ var GameAudio = (function () {
     isEnabled: function () { return enabled; },
     unlock: function () { ensureCtx(); },
     sample: sample,
+    // the synth building blocks, for themes (e.g. js/space/) that bring their own sounds
+    kit: { tone: tone, noise: noise },
 
     // traffic: 1 while the chicken's lane (or the next) is a road; rain: weather intensity 0..1
     setAmbience: function (traffic, rain) {

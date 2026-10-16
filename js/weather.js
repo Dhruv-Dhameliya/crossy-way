@@ -1,14 +1,13 @@
 // Day / night cycle (driven by how far you've run) and weather (clear, rain
-// with lightning, fog). It owns the sky, fog and light colours. In the Space
-// biome the sky is always a starry dusk, rain becomes a meteor shower and fog
-// a purple nebula haze; drifting space dust fills the air.
+// with lightning, fog). It owns the sky, fog and light colours. A biome theme can
+// take over the sky (theme.sky: {sky, ambC, ambI, sunC, sunI, night, fog}) and add
+// its own atmosphere effects (theme.fx: {init, update, label}); its sky blends in
+// as you cross the border. The Forest has no theme sky: it uses the day cycle.
 var Weather = (function () {
   var DAY = { sky: 0xb7e4f7, ambC: 0xffffff, ambI: 0.66, sunC: 0xfff6e0, sunI: 0.62, night: 0 };
   var DUSK = { sky: 0xf5a86b, ambC: 0xffd9b8, ambI: 0.56, sunC: 0xffa86b, sunI: 0.55, night: 0.35 };
   var NIGHT = { sky: 0x101a3d, ambC: 0x8fa8ff, ambI: 0.46, sunC: 0x7f9dff, sunI: 0.3, night: 1 };
   var DAWN = { sky: 0xf7b6c8, ambC: 0xffe0e6, ambI: 0.58, sunC: 0xffc9a8, sunI: 0.55, night: 0.3 };
-  var SPACE = { sky: 0x120f2e, ambC: 0xb9a8ff, ambI: 0.64, sunC: 0xcfd8ff, sunI: 0.5, night: 0.62 };
-  var NEBULA = 0x4a2a8c;
   var TRACK = [[0, DAY], [0.36, DAY], [0.48, DUSK], [0.6, NIGHT], [0.86, NIGHT], [0.94, DAWN], [1, DAY]];
   var CYCLE_ROWS = 220;      // one full day/night cycle
   var RAIN_MAX = 480;
@@ -23,9 +22,8 @@ var Weather = (function () {
   var rainLines = null, rainPos = null, rainVel = null;
   var rainCount = 400;
   var tmpA = new THREE.Color(), tmpB = new THREE.Color();
-  var spaceMix = 0, spaceTarget = 0;   // 0 = forest sky, 1 = space sky
-  var meteors = null, meteorPos = null, meteorVel = null, meteorAmt = 0;
-  var dust = null, dustPos = null, METEOR_MAX = 18, DUST_MAX = 150;
+  var skyMix = 0, skyTarget = 0;   // 0 = normal sky, 1 = the active theme's sky
+  var activeTheme = null;          // the theme whose sky is (fading) in
   var GRAY = new THREE.Color(0x93a1ad);
 
   function sample(t) {
@@ -60,29 +58,10 @@ var Weather = (function () {
     scene.add(rainLines);
     for (var i = 0; i < RAIN_MAX; i++) rainVel[i] = Utils.randRange(20, 28);
     initClouds();
-    initSpace();
-  }
-
-  // Meteor streaks and floating dust (only visible in the Space biome).
-  function initSpace() {
-    meteorPos = new Float32Array(METEOR_MAX * 6);
-    meteorVel = [];
-    var mg = new THREE.BufferGeometry();
-    mg.setAttribute('position', new THREE.BufferAttribute(meteorPos, 3).setUsage(THREE.DynamicDrawUsage));
-    meteors = new THREE.LineSegments(mg, new THREE.LineBasicMaterial({ color: 0xffc28a, transparent: true, opacity: 0, depthWrite: false, fog: false }));
-    meteors.frustumCulled = false;
-    meteors.visible = false;
-    scene.add(meteors);
-    for (var i = 0; i < METEOR_MAX; i++) meteorVel.push({ vx: 0, vy: 0, vz: 0, alive: false, wait: Utils.randRange(0, 3) });
-
-    dustPos = new Float32Array(DUST_MAX * 3);
-    for (var d = 0; d < DUST_MAX; d++) { dustPos[d * 3] = Utils.randRange(-18, 18); dustPos[d * 3 + 1] = Utils.randRange(0.2, 9); dustPos[d * 3 + 2] = Utils.randRange(-18, 18); }
-    var dg = new THREE.BufferGeometry();
-    dg.setAttribute('position', new THREE.BufferAttribute(dustPos, 3).setUsage(THREE.DynamicDrawUsage));
-    dust = new THREE.Points(dg, new THREE.PointsMaterial({ color: 0xdfe8ff, size: 2.4, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
-    dust.frustumCulled = false;
-    dust.visible = false;
-    scene.add(dust);
+    Biome.list().forEach(function (n) {
+      var T = Biome.themes[n];
+      if (T.fx && T.fx.init) T.fx.init(scene);
+    });
   }
 
   // Drifting cloud SHADOWS: invisible boxes high up that only cast shadows, so soft
@@ -121,8 +100,9 @@ var Weather = (function () {
 
   // Which biome the chicken is in; the sky blends over about a second.
   function setBiome(name, snap) {
-    spaceTarget = name === 'space' ? 1 : 0;
-    if (snap) spaceMix = spaceTarget;
+    var T = Biome.theme(name);
+    if (T.sky) { activeTheme = T; skyTarget = 1; } else skyTarget = 0;
+    if (snap) { skyMix = skyTarget; if (!skyTarget) activeTheme = null; }
   }
 
   // Back to a clear morning (new run). snap = jump there instantly.
@@ -131,7 +111,7 @@ var Weather = (function () {
     target.rain = target.fog = 0;
     nextChange = Utils.randInt(25, 40);
     flash = 0; thunderTimer = 8;
-    if (snap) { cur = null; spaceMix = spaceTarget; }
+    if (snap) { cur = null; skyMix = skyTarget; if (!skyTarget) activeTheme = null; }
   }
 
   function timeOfDay(rows) {
@@ -152,9 +132,9 @@ var Weather = (function () {
     var rate = 0.3 * dt;
     rain += Utils.clamp(target.rain - rain, -rate, rate);
     fog += Utils.clamp(target.fog - fog, -rate, rate);
-    spaceMix += Utils.clamp(spaceTarget - spaceMix, -0.7 * dt, 0.7 * dt);
-    var rainReal = rain * (1 - spaceMix);     // in space the "rain" is a meteor shower
-    meteorAmt = Math.max(rain * spaceMix, 0.2 * spaceMix);
+    skyMix += Utils.clamp(skyTarget - skyMix, -0.7 * dt, 0.7 * dt);
+    var rainReal = rain * (1 - skyMix);       // under a theme sky the "rain" is the theme's own weather
+    var themeRain = rain * skyMix;
 
     // ---- lightning ----
     if (rainReal > 0.55) {
@@ -171,13 +151,14 @@ var Weather = (function () {
     // ---- time of day ----
     var t = timeOfDay(rows);
     var goal = sample(t);
-    if (spaceMix > 0.001) {
-      goal.sky.lerp(tmpA.setHex(SPACE.sky), spaceMix);
-      goal.ambC.lerp(tmpA.setHex(SPACE.ambC), spaceMix);
-      goal.sunC.lerp(tmpA.setHex(SPACE.sunC), spaceMix);
-      goal.ambI = Utils.lerp(goal.ambI, SPACE.ambI, spaceMix);
-      goal.sunI = Utils.lerp(goal.sunI, SPACE.sunI, spaceMix);
-      goal.night = Utils.lerp(goal.night, SPACE.night, spaceMix);
+    var TS = skyMix > 0.001 && activeTheme ? activeTheme.sky : null;
+    if (TS) {
+      goal.sky.lerp(tmpA.setHex(TS.sky), skyMix);
+      goal.ambC.lerp(tmpA.setHex(TS.ambC), skyMix);
+      goal.sunC.lerp(tmpA.setHex(TS.sunC), skyMix);
+      goal.ambI = Utils.lerp(goal.ambI, TS.ambI, skyMix);
+      goal.sunI = Utils.lerp(goal.sunI, TS.sunI, skyMix);
+      goal.night = Utils.lerp(goal.night, TS.night, skyMix);
     }
     if (!cur) { cur = goal; } else {
       var k = 1 - Math.exp(-dt * 2.2);
@@ -190,7 +171,7 @@ var Weather = (function () {
     var gloom = Math.max(rainReal, fog * 0.85);
     GRAY.setHex(0x93a1ad);
     tmpA.copy(GRAY).multiplyScalar(0.22 + 0.78 * (1 - cur.night));
-    if (spaceMix > 0.001) tmpA.lerp(tmpB.setHex(NEBULA), spaceMix);   // fog is a purple nebula in space
+    if (TS && TS.fog !== undefined) tmpA.lerp(tmpB.setHex(TS.fog), skyMix);   // fog takes the theme's tint
     bgColor.copy(cur.sky).lerp(tmpA, 0.6 * gloom);
     if (flash > 0) bgColor.lerp(tmpB.setHex(0xe8f0ff), flash * 0.5);
     scene.fog.color.copy(bgColor);
@@ -207,7 +188,7 @@ var Weather = (function () {
 
     // ---- cloud shadows drift past (only worth drawing when shadows are on) ----
     cloudT += dt;
-    cloudGroup.visible = !!sun.castShadow && sun.intensity > 0.2 && spaceMix < 0.5;
+    cloudGroup.visible = !!sun.castShadow && sun.intensity > 0.2 && skyMix < 0.5;
     if (cloudGroup.visible) {
       for (var ci = 0; ci < clouds.length; ci++) {
         var c = clouds[ci];
@@ -220,7 +201,10 @@ var Weather = (function () {
       }
     }
 
-    updateSpaceFx(dt, camX, camZ, level);
+    if (activeTheme) {
+      if (activeTheme.fx && activeTheme.fx.update) activeTheme.fx.update(dt, camX, camZ, level, skyMix, themeRain, cloudT, fog);
+      if (skyMix <= 0 && skyTarget === 0) activeTheme = null;   // fully faded out
+    }
 
     // ---- rain streaks ----
     var on = rainReal > 0.03;
@@ -248,48 +232,6 @@ var Weather = (function () {
     }
   }
 
-  // Meteors streak across the sky and dust drifts by (cheap: a few lines and points).
-  function updateSpaceFx(dt, camX, camZ, level) {
-    var showDust = spaceMix > 0.02;
-    dust.visible = showDust;
-    if (showDust) {
-      dust.material.opacity = (0.55 + 0.25 * Math.sin(cloudT * 2.3)) * spaceMix;
-      var nd = level === 'high' ? DUST_MAX : level === 'medium' ? 100 : 60;
-      for (var d = 0; d < nd; d++) {
-        var o = d * 3;
-        dustPos[o + 1] += dt * 0.12;
-        if (dustPos[o + 1] > 9.5) dustPos[o + 1] = 0.2;
-        // keep the field centred on the camera as it moves
-        if (dustPos[o] < camX - 18) dustPos[o] += 36; else if (dustPos[o] > camX + 18) dustPos[o] -= 36;
-        if (dustPos[o + 2] < camZ - 18) dustPos[o + 2] += 36; else if (dustPos[o + 2] > camZ + 18) dustPos[o + 2] -= 36;
-      }
-      dust.geometry.setDrawRange(0, nd);
-      dust.geometry.attributes.position.needsUpdate = true;
-    }
-    var on = meteorAmt > 0.02 && spaceMix > 0.02;
-    meteors.visible = on;
-    if (!on) return;
-    meteors.material.opacity = Math.min(0.9, 0.35 + meteorAmt * 0.6);
-    var count = Math.max(2, Math.round(METEOR_MAX * meteorAmt * (level === 'low' ? 0.5 : 1)));
-    for (var i = 0; i < METEOR_MAX; i++) {
-      var m = meteorVel[i], p = meteorPos, k = i * 6;
-      if (i >= count && !m.alive) { p[k] = p[k + 1] = p[k + 2] = p[k + 3] = p[k + 4] = p[k + 5] = 0; continue; }
-      if (!m.alive) {
-        m.wait -= dt;
-        if (m.wait > 0) continue;
-        m.alive = true;
-        m.x = camX + Utils.randRange(-6, 22); m.y = Utils.randRange(7, 13); m.z = camZ + Utils.randRange(4, 20);
-        var sp = Utils.randRange(14, 24);
-        m.vx = -sp * 0.8; m.vy = -sp * 0.45; m.vz = -sp * 0.5;
-      }
-      m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt;
-      p[k] = m.x; p[k + 1] = m.y; p[k + 2] = m.z;
-      p[k + 3] = m.x - m.vx * 0.09; p[k + 4] = m.y - m.vy * 0.09; p[k + 5] = m.z - m.vz * 0.09;
-      if (m.y < 0.2) { m.alive = false; m.wait = Utils.randRange(0.2, 2.5) / Math.max(0.3, meteorAmt); p[k] = p[k + 1] = p[k + 2] = p[k + 3] = p[k + 4] = p[k + 5] = 0; }
-    }
-    meteors.geometry.attributes.position.needsUpdate = true;
-  }
-
   return {
     init: init,
     setModes: setModes,
@@ -298,13 +240,14 @@ var Weather = (function () {
     update: update,
     timeMode: function () { return timeMode; },
     weatherMode: function () { return weatherMode; },
-    get rain() { return rain * (1 - spaceMix); },
-    get space() { return spaceMix; },
+    get rain() { return rain * (1 - skyMix); },
+    get themeMix() { return skyMix; },
+    get themeName() { return activeTheme ? activeTheme.name : null; },
     get fog() { return fog; },
     get night() { return cur ? cur.night : 0; },
     label: function () {
       var n = cur ? cur.night : 0;
-      if (spaceMix > 0.5) return '🌌' + (meteorAmt > 0.3 ? '☄️' : fog > 0.3 ? '🌫️' : '');
+      if (skyMix > 0.5 && activeTheme && activeTheme.fx && activeTheme.fx.label) return activeTheme.fx.label({ fog: fog, rain: rain * skyMix });
       return (n > 0.6 ? '🌙' : n > 0.15 ? '🌆' : '☀️') + (rain > 0.3 ? '🌧️' : fog > 0.3 ? '🌫️' : '');
     }
   };

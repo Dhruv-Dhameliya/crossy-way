@@ -14,20 +14,24 @@ var Models = (function () {
   // geometry is baked once and shared by every instance (saves a geometry
   // merge, and GPU memory, per spawned vehicle / log / train car).
   var geoCache = {};
-  function cachedMesh(key, makeBoxes) {
+  // material: optional (a biome theme may use its own, e.g. a glowing one)
+  function cachedMesh(key, makeBoxes, material) {
     var g = geoCache[key];
     if (!g) {
       g = Utils.voxelGeometry(makeBoxes());
       g.__shared = true;
       geoCache[key] = g;
     }
-    var m = new THREE.Mesh(g, Utils.voxelMaterial());
+    var m = new THREE.Mesh(g, material || Utils.voxelMaterial());
     m.castShadow = true;
     m.receiveShadow = true;
     return m;
   }
 
-  // Other biomes (space...) register their props here: same kinds, new looks.
+  // Other biomes register their props here (see js/space/): same kinds, new looks.
+  // A biome may define: obstacles, border, flower, rock, bush, vehicles, vehicleColors,
+  // logBoxes, pad, turtleBoxes, locoBoxes, carBoxes, carColors, croc, platform, gate,
+  // signalStyle, material (used for its moving props), warm().
   var BIOMES = {};
   function biomeOf(name) { return name ? BIOMES[name] || null : null; }
 
@@ -410,7 +414,8 @@ var Models = (function () {
       : kind === 'truck' ? Utils.choice([0xe8453c, 0x3f7fe0, 0xffa726, 0x35b86b])
         : Utils.choice(palette);
     var variant = Utils.randInt(0, 2);
-    var mesh = cachedMesh('veh:' + (biome || '') + ':' + kind + ':' + color + ':' + variant, function () { return def.build(color); });
+    var mesh = cachedMesh('veh:' + (biome || '') + ':' + kind + ':' + color + ':' + variant, function () { return def.build(color); }, bm && bm.material);
+    if (bm && bm.decorate) bm.decorate(mesh, kind, color, def.len);   // a biome may add glow, trails...
     mesh.add(buildBeam(def.len)); // headlight glow, only drawn at night
     return mesh;
   }
@@ -455,7 +460,7 @@ var Models = (function () {
   // ---------------------------------------------------------------------
   function buildLog(length, biome) {
     var bm = biomeOf(biome);
-    return cachedMesh('log:' + (biome || '') + ':' + length + ':' + Utils.randInt(0, 2), function () { return bm ? bm.logBoxes(length) : logBoxes(length); });
+    return cachedMesh('log:' + (biome || '') + ':' + length + ':' + Utils.randInt(0, 2), function () { return bm ? bm.logBoxes(length) : logBoxes(length); }, bm && bm.material);
   }
 
   function logBoxes(length) {
@@ -475,7 +480,7 @@ var Models = (function () {
   // A group of n turtles that paddle along; the world makes them dive now and then.
   function buildTurtles(n, biome) {
     var bm = biomeOf(biome);
-    if (bm) return Utils.voxelMesh(bm.turtleBoxes(n));
+    if (bm) return Utils.voxelMesh(bm.turtleBoxes(n), bm.material ? { material: bm.material } : undefined);
     var o = [];
     for (var i = 0; i < n; i++) {
       var x = (i - (n - 1) / 2) * 1.05;
@@ -530,7 +535,7 @@ var Models = (function () {
 
   function buildLocomotive(biome) {
     var bm = biomeOf(biome);
-    return cachedMesh('loco:' + (biome || ''), bm ? bm.locoBoxes : locomotiveBoxes);
+    return cachedMesh('loco:' + (biome || ''), bm ? bm.locoBoxes : locomotiveBoxes, bm && bm.material);
   }
 
   function locomotiveBoxes() {
@@ -556,7 +561,7 @@ var Models = (function () {
   function buildTrainCar(biome) {
     var bm = biomeOf(biome);
     var c = Utils.choice(bm ? bm.carColors : TRAIN_CAR_COLORS);
-    return cachedMesh('car:' + (biome || '') + ':' + c, function () { return bm ? bm.carBoxes(c) : trainCarBoxes(c); });
+    return cachedMesh('car:' + (biome || '') + ':' + c, function () { return bm ? bm.carBoxes(c) : trainCarBoxes(c); }, bm && bm.material);
   }
 
   function trainCarBoxes(c) {
@@ -590,16 +595,18 @@ var Models = (function () {
 
   // Railway signal like a little traffic light: GREEN = the track is clear,
   // flashing RED = a train is on its way. The caller swaps the lamp materials.
-  function buildSignal() {
+  function buildSignal(biome) {
     var A = signalAssets();
     var g = new THREE.Group();
+    var bm = biomeOf(biome);
+    var st = (bm && bm.signalStyle) || { base: 0x555a63, pole: 0x8a8d96, housing: 0x23262b, cap: 0xe53935, extra: [] };
     g.add(Utils.voxelMesh([
-      B(0, 0.05, 0, 0.3, 0.1, 0.3, 0x555a63),
-      B(0, 0.7, 0, 0.1, 1.3, 0.1, 0x8a8d96),
-      B(0, 1.4, 0, 0.36, 0.66, 0.18, 0x23262b),
-      B(0, 1.76, 0, 0.42, 0.06, 0.24, 0xe53935),
-      B(0, 1.73, 0, 0.06, 0.1, 0.06, 0x23262b)
-    ]));
+      B(0, 0.05, 0, 0.3, 0.1, 0.3, st.base),
+      B(0, 0.7, 0, 0.1, 1.3, 0.1, st.pole),
+      B(0, 1.4, 0, 0.36, 0.66, 0.18, st.housing),
+      B(0, 1.76, 0, 0.42, 0.06, 0.24, st.cap),
+      B(0, 1.73, 0, 0.06, 0.1, 0.06, st.housing)
+    ].concat(st.extra || []), bm && bm.material ? { material: bm.material } : undefined));
     var red = [], green = [];
     [-1, 1].forEach(function (sz) {
       var r = new THREE.Mesh(A.geo, A.redOff);
@@ -723,7 +730,7 @@ var Models = (function () {
     g.add(buildCoin());
     g.add(buildSignal().group);
     g.add(buildPad(true));
-    if (BIOMES.space) g.add(buildPad(true, 'space'));
+    Object.keys(BIOMES).forEach(function (k) { if (BIOMES[k].warm) g.add(BIOMES[k].warm()); });
     g.add(buildBeam(1.2));
     g.add(buildTurtles(2));
     g.add(Utils.voxelMesh([B(0, 0.1, 0, 0.1, 0.2, 0.1, 0x3f9f4b)], { material: sceneryMaterial() }));
@@ -821,8 +828,7 @@ var Models = (function () {
   // when the head is dangerous.
   // ---------------------------------------------------------------------
   var CROC_PAL = {
-    forest: { body: 0x4a8f3a, belly: 0xcfd98a, dark: 0x2f6a2a, ridge: 0x3a7a2e, eye: 0xffe14d, mouth: 0xd94a4a },
-    space: { body: 0x6b4fd8, belly: 0xb7a3ff, dark: 0x3a2f8f, ridge: 0x45e6a8, eye: 0x7df3ff, mouth: 0xff5fd2 }
+    forest: { body: 0x4a8f3a, belly: 0xcfd98a, dark: 0x2f6a2a, ridge: 0x3a7a2e, eye: 0xffe14d, mouth: 0xd94a4a }
   };
   var CROC_HEAD = 1.0; // length of the dangerous head at the front
 
@@ -882,27 +888,18 @@ var Models = (function () {
   // Moving platforms over a bottomless chasm (stone slab / hover plate)
   // ---------------------------------------------------------------------
   function buildPlatform(width, biome) {
-    return cachedMesh('plat:' + (biome || 'forest') + ':' + width, function () {
+    var bm = biomeOf(biome);
+    if (bm && bm.platform) return bm.platform(width);
+    return cachedMesh('plat:forest:' + width, function () {
       var o = [];
-      if (biome === 'space') {
-        o.push(B(0, 0, 0, width, 0.3, 0.78, 0x3d4470));
-        o.push(B(0, 0.165, 0, width - 0.1, 0.03, 0.66, 0x5a64a0));
-        o.push(B(0, -0.17, 0, width - 0.3, 0.05, 0.5, 0x4de8ff));
-        o.push(B(0, 0.19, 0, width - 0.3, 0.01, 0.04, 0x7df3ff));
-        o.push(B(-width / 2 + 0.2, 0.19, 0.22, 0.12, 0.02, 0.12, 0xff5fd2));
-        o.push(B(width / 2 - 0.2, 0.19, -0.22, 0.12, 0.02, 0.12, 0xff5fd2));
-        o.push(B(width / 2 + 0.01, 0, 0, 0.04, 0.32, 0.8, 0x7480a6));
-        o.push(B(-width / 2 - 0.01, 0, 0, 0.04, 0.32, 0.8, 0x7480a6));
-      } else {
-        o.push(B(0, 0, 0, width, 0.34, 0.78, 0x8d8f99));
-        o.push(B(0, -0.11, 0, width + 0.02, 0.12, 0.8, 0x6a6c76));
-        o.push(B(0, 0.175, 0, width * 0.94, 0.02, 0.58, 0xa9abb5));
-        o.push(B(-width / 2 + 0.3, 0.185, 0.1, 0.34, 0.02, 0.22, 0x5aa648));    // moss
-        o.push(B(width / 2 - 0.4, 0.185, -0.15, 0.24, 0.02, 0.18, 0x5aa648));
-        o.push(B(0, 0.19, 0, 0.3, 0.015, 0.3, 0xff8a3d));                       // rune
-        o.push(B(width / 2 + 0.01, 0, 0, 0.04, 0.36, 0.8, 0xc4c6d0));
-        o.push(B(-width / 2 - 0.01, 0, 0, 0.04, 0.36, 0.8, 0xc4c6d0));
-      }
+      o.push(B(0, 0, 0, width, 0.34, 0.78, 0x8d8f99));
+      o.push(B(0, -0.11, 0, width + 0.02, 0.12, 0.8, 0x6a6c76));
+      o.push(B(0, 0.175, 0, width * 0.94, 0.02, 0.58, 0xa9abb5));
+      o.push(B(-width / 2 + 0.3, 0.185, 0.1, 0.34, 0.02, 0.22, 0x5aa648));    // moss
+      o.push(B(width / 2 - 0.4, 0.185, -0.15, 0.24, 0.02, 0.18, 0x5aa648));
+      o.push(B(0, 0.19, 0, 0.3, 0.015, 0.3, 0xff8a3d));                       // rune
+      o.push(B(width / 2 + 0.01, 0, 0, 0.04, 0.36, 0.8, 0xc4c6d0));
+      o.push(B(-width / 2 - 0.01, 0, 0, 0.04, 0.36, 0.8, 0xc4c6d0));
       return o;
     });
   }
@@ -911,10 +908,10 @@ var Models = (function () {
   // Biome portal: two pillars that mark where the world changes
   // ---------------------------------------------------------------------
   function buildGate(biome) {
+    var bm = biomeOf(biome);
+    if (bm && bm.gate) return bm.gate();
     var g = new THREE.Group();
-    var cols = biome === 'space'
-      ? { stone: 0x3a3e66, trim: 0x4de8ff, cap: 0xff5fd2 }
-      : { stone: 0x8d8f99, trim: 0x5aa648, cap: 0xffd23f };
+    var cols = { stone: 0x8d8f99, trim: 0x5aa648, cap: 0xffd23f };
     [-1, 1].forEach(function (s) {
       var o = [
         B(0, 0.2, 0, 0.62, 0.4, 0.62, cols.stone),

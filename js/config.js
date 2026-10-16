@@ -105,40 +105,49 @@ var Difficulty = {
 // ---------------------------------------------------------------------------
 // Biomes. Same game in every biome - only the look (ground, props, vehicles,
 // lighting, sounds) changes. Lane variants (ice / void) exist in every biome.
+//
+// The Forest is the default world and lives in the normal game files. Every other
+// biome (Space...) is a self-contained "theme" in its own folder that registers
+// itself here with Biome.register(name, theme). The shared game code never checks
+// for a particular biome: it only asks the row's theme for optional hooks (a hook
+// that is missing means "do the normal Forest thing"), so a theme cannot break
+// the Forest. Hooks a theme may provide:
+//   label, enter {text,color}, colors, backdrop, musicMood, idleWarn(),
+//   ground(kit, type, parity, edge, variant, tiles, colors), sceneryMaterial(),
+//   vehicleBob(v, row, t), logSway(log, t), diveColors, fallsInWater, noRails,
+//   trainAudio {warn, ping, toot, pass}, attack {begin, update, reset, duration},
+//   suit(), shadowGlow, puffColors, fallColors, sky/fx (see weather.js),
+//   card {bg(c,W,H), ...} (share card), update(dt, time)
 // ---------------------------------------------------------------------------
 CONFIG.BIOME_COLORS = {
   forest: Object.assign({}, CONFIG.COLORS, {
     iceA: 0xcdeffa, iceB: 0xbfe6f5, iceSide: 0x8fc4d8,
     voidA: 0x231b15, voidB: 0x1b1410, voidSide: 0x0d0907, voidAccent: 0xff8a3d,
     backdrop: CONFIG.COLORS.grassB
-  }),
-  space: {
-    sky: 0x120f2e,
-    grassA: 0x6f6c92, grassB: 0x66638a, grassSide: 0x3f3d62,
-    roadA: 0x1f2d5c, roadB: 0x1a2750, roadSide: 0x080b26, roadLine: 0x4de8ff,
-    waterA: 0x070a26, waterB: 0x050820, waterSide: 0x02030f, waterAccent: 0x8ff4ff,
-    railBedA: 0x3a3f5c, railBedB: 0x343955, railSide: 0x1d2038, sleeper: 0x2fd4e8, rail: 0xaef6ff,
-    iceA: 0x9fe9ff, iceB: 0x8adcf5, iceSide: 0x4aa3c8,
-    voidA: 0x030308, voidB: 0x020206, voidSide: 0x000000, voidAccent: 0xff8a3d,
-    coin: CONFIG.COLORS.coin, coinDark: CONFIG.COLORS.coinDark, coinShine: CONFIG.COLORS.coinShine,
-    backdrop: 0x2a2750
-  }
+  })
 };
 
-// Which biome a row belongs to. "auto" walks through the biomes as you run
-// (Forest, then Space, then back...); "forest" / "space" lock one in.
+// Which biome a row belongs to. "auto" walks through the registered biomes as you
+// run (Forest, then Space, then back...); a name locks one in.
 var Biome = {
   mode: (function () {
     var m = null;
     try { m = localStorage.getItem(CONFIG.BIOME_KEY); } catch (e) { /* private mode */ }
-    return m === 'forest' || m === 'space' ? m : 'auto';
+    return m || 'auto';
   })(),
   LEN: 110,                      // rows per biome in auto mode
-  order: ['forest', 'space'],
-  forRow: function (z) {
-    if (this.mode !== 'auto') return this.mode;
-    if (z < 0) return this.order[0];
-    return this.order[Math.floor(z / this.LEN) % this.order.length];
+  themes: {
+    forest: { name: 'forest', label: '\U0001F332 FOREST', enter: { text: '\U0001F332 BACK ON EARTH!', color: '#3fb04c' } }
   },
-  colors: function (b) { return CONFIG.BIOME_COLORS[b] || CONFIG.BIOME_COLORS.forest; }
+  register: function (name, theme) { theme.name = name; this.themes[name] = theme; },
+  list: function () { return Object.keys(this.themes); },
+  valid: function (m) { return m === 'auto' || !!this.themes[m]; },
+  theme: function (b) { return this.themes[b] || this.themes.forest; },
+  forRow: function (z) {
+    if (this.mode !== 'auto' && this.themes[this.mode]) return this.mode;
+    var order = this.list();
+    if (z < 0 || order.length < 2) return order[0];
+    return order[Math.floor(z / this.LEN) % order.length];
+  },
+  colors: function (b) { return this.theme(b).colors || CONFIG.BIOME_COLORS.forest; }
 };

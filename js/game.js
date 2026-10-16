@@ -23,7 +23,7 @@
   var eagleCried = false;   // the eagle's screech has been played for this idle spell
   var curBiome = 'forest';  // biome of the row the chicken stands on (sky, helmet, music follow it)
   var shareBlob = null, shareUrl = null;
-  var bdMix = 0, bdSpace = new THREE.Color(CONFIG.BIOME_COLORS.space.backdrop);
+  var bdMix = -1, bdColor = new THREE.Color();   // backdrop colour follows the active biome theme
   var camKick = 0;          // little camera dip on every landing
   var tmpV = new THREE.Vector3();
   var startCam = { x: 0, z: CONFIG.CAMERA_LEAD }; // title-screen view (chicken parked in free screen space)
@@ -735,7 +735,7 @@
 
   // Auto walks Forest -> Space -> Forest...; the others lock one biome in.
   function applyBiome(mode, silent) {
-    if (mode !== 'forest' && mode !== 'space') mode = 'auto';
+    if (!Biome.valid(mode)) mode = 'auto';
     Biome.mode = mode;
     try { localStorage.setItem(CONFIG.BIOME_KEY, mode); } catch (e) { /* private mode */ }
     el.biomeButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-biome') === mode); });
@@ -752,9 +752,11 @@
     var changed = b !== curBiome;
     curBiome = b;
     Weather.setBiome(b, snap);
-    player.setSuit(b === 'space');
+    player.setTheme(b);
+    document.body.setAttribute('data-biome', b);   // lets a theme restyle the page (css/space.css)
     if (changed && !snap && state === 'playing') {
-      showToast(b === 'space' ? '🚀 WELCOME TO SPACE!' : '🌲 BACK ON EARTH!', b === 'space' ? '#8f6bff' : '#3fb04c');
+      var enter = Biome.theme(b).enter;
+      if (enter) showToast(enter.text, enter.color);
       if (GameAudio) GameAudio.portal();
     }
   }
@@ -1264,7 +1266,18 @@
   // ---- share card ------------------------------------------------------------
   // The share button makes a picture: a snapshot of the final scene, the score,
   // the mode and the biome, ready for a post. It can be shared, saved or copied.
-  var BIOME_LABEL = { forest: '🌲 FOREST', space: '🚀 SPACE' };
+  // The share card's look. The Forest's is here; a biome theme supplies its own (theme.card).
+  var FOREST_CARD = {
+    bg: [[0, '#8fd8ff'], [0.5, '#c4efa0'], [1, '#58b64a']],
+    deco: function (c, W) {
+      c.globalAlpha = 0.5; c.fillStyle = '#ffffff';
+      [[120, 120, 150], [900, 90, 120], [520, 60, 90]].forEach(function (q) {
+        c.beginPath(); c.arc(q[0], q[1], q[2] * 0.5, 0, 7); c.arc(q[0] + q[2] * 0.4, q[1] + 10, q[2] * 0.4, 0, 7); c.arc(q[0] - q[2] * 0.4, q[1] + 14, q[2] * 0.36, 0, 7); c.fill();
+      });
+      c.globalAlpha = 1;
+    },
+    label: '#2d5a22', tagBg: '#2f8f3a', chipFill: 'rgba(255,255,255,0.7)', chipStroke: null, chipText: null, foot: null, host: '#2d5a22'
+  };
 
   function shareText() {
     return 'I scored ' + score + ' on ' + Difficulty.cur.label + ' in Crossy Way! Can you beat me?';
@@ -1320,33 +1333,16 @@
       var cv = document.createElement('canvas');
       cv.width = W; cv.height = H;
       var c = cv.getContext('2d');
-      var space = curBiome === 'space';
+      var K = Biome.theme(curBiome).card || FOREST_CARD;
       var font = (getComputedStyle(document.documentElement).getPropertyValue('--title-font') || '').trim() || 'Arial, sans-serif';
 
       // background
       var g = c.createLinearGradient(0, 0, 0, H);
-      if (space) { g.addColorStop(0, '#1b1450'); g.addColorStop(0.55, '#2c2178'); g.addColorStop(1, '#0d0a2c'); }
-      else { g.addColorStop(0, '#8fd8ff'); g.addColorStop(0.5, '#c4efa0'); g.addColorStop(1, '#58b64a'); }
+      K.bg.forEach(function (stop) { g.addColorStop(stop[0], stop[1]); });
       c.fillStyle = g; c.fillRect(0, 0, W, H);
       var seed = 7;
       function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
-      if (space) {
-        for (var i = 0; i < 90; i++) {
-          c.globalAlpha = 0.3 + rnd() * 0.7;
-          c.fillStyle = rnd() < 0.2 ? '#8ff4ff' : '#ffffff';
-          var s = 3 + rnd() * 6;
-          c.fillRect(rnd() * W, rnd() * H, s, s);
-        }
-        c.globalAlpha = 0.25; c.fillStyle = '#8f6bff';
-        c.beginPath(); c.arc(W * 0.86, 120, 170, 0, 7); c.fill();
-        c.globalAlpha = 1;
-      } else {
-        c.globalAlpha = 0.5; c.fillStyle = '#ffffff';
-        [[120, 120, 150], [900, 90, 120], [520, 60, 90]].forEach(function (q) {
-          c.beginPath(); c.arc(q[0], q[1], q[2] * 0.5, 0, 7); c.arc(q[0] + q[2] * 0.4, q[1] + 10, q[2] * 0.4, 0, 7); c.arc(q[0] - q[2] * 0.4, q[1] + 14, q[2] * 0.36, 0, 7); c.fill();
-        });
-        c.globalAlpha = 1;
-      }
+      K.deco(c, W, H, rnd);
 
       // title
       var letters = [['C', '#ff5a5f'], ['R', '#ff9f1c'], ['O', '#ffd23f'], ['S', '#5cb83f'], ['S', '#2ec4b6'], ['Y', '#3d8bff'], [' ', '#fff'], ['W', '#c36bff'], ['A', '#ff5a5f'], ['Y', '#ffd23f']];
@@ -1360,7 +1356,7 @@
       });
       c.textAlign = 'center';
       c.font = '700 30px ' + font;
-      c.fillStyle = space ? '#bfb4ff' : '#2d5a22';
+      c.fillStyle = K.label;
       c.fillText('H O P  ·  D O D G E  ·  S U R V I V E', W / 2, 218);
 
       // snapshot of the final scene
@@ -1378,10 +1374,10 @@
 
       // biome tag + a chicken sticker
       c.font = '400 40px ' + font;
-      var tag = BIOME_LABEL[curBiome] || BIOME_LABEL.forest;
+      var tag = Biome.theme(curBiome).label;
       var tw = c.measureText(tag).width + 56;
       roundRect(c, bx + 24, by + 24, tw, 70, 35);
-      c.fillStyle = space ? '#3b2cb0' : '#2f8f3a'; c.fill();
+      c.fillStyle = K.tagBg; c.fill();
       c.lineWidth = 6; c.strokeStyle = '#ffffff'; c.stroke();
       c.fillStyle = '#ffffff'; c.textAlign = 'left';
       c.fillText(tag, bx + 52, by + 76);
@@ -1400,7 +1396,7 @@
       c.textAlign = 'center';
       if (!record) {
         c.font = '700 34px ' + font;
-        c.fillStyle = space ? '#bfb4ff' : '#2d5a22';
+        c.fillStyle = K.label;
         c.fillText('S C O R E', W / 2, 880);
       }
       c.font = '400 250px ' + font;
@@ -1433,9 +1429,9 @@
       var cx = (W - sumW) / 2;
       chips.forEach(function (t, k) {
         roundRect(c, cx, 1150, widths[k], 80, 40);
-        c.fillStyle = space ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.7)'; c.fill();
-        c.lineWidth = 5; c.strokeStyle = space ? '#8f6bff' : INK; c.stroke();
-        c.fillStyle = space ? '#ffffff' : INK; c.textAlign = 'left';
+        c.fillStyle = K.chipFill; c.fill();
+        c.lineWidth = 5; c.strokeStyle = K.chipStroke || INK; c.stroke();
+        c.fillStyle = K.chipText || INK; c.textAlign = 'left';
         c.fillText(t, cx + 28, 1204);
         cx += widths[k] + gap;
       });
@@ -1443,10 +1439,10 @@
       // footer
       c.textAlign = 'center';
       c.font = '700 40px ' + font;
-      c.fillStyle = space ? '#ffffff' : INK;
+      c.fillStyle = K.foot || INK;
       c.fillText('Can you beat me?', W / 2, 1292);
       var host = location.protocol.indexOf('http') === 0 ? location.host : '';
-      if (host) { c.font = '700 26px ' + font; c.fillStyle = space ? '#bfb4ff' : '#2d5a22'; c.fillText(host, W / 2, 1330); }
+      if (host) { c.font = '700 26px ' + font; c.fillStyle = K.host; c.fillText(host, W / 2, 1330); }
       return cv;
     });
   }
@@ -1562,7 +1558,7 @@
       player.startDeath('eagle', world);
     } else if (idleTimer >= wait - 3 && !eagleCried) {
       eagleCried = true;
-      if (GameAudio) GameAudio.eagleCry();
+      if (GameAudio) { var warn = Biome.theme(curBiome).idleWarn; if (warn) warn(); else GameAudio.eagleCry(); }
     }
   }
 
@@ -1578,11 +1574,17 @@
     var amb = world.amb;
     if (GameAudio) GameAudio.setAmbience(quiet ? 0 : amb.traffic, quiet ? 0 : Weather.rain);
     syncBiome(false);
+    var biomeTheme = Biome.theme(curBiome);
+    if (biomeTheme.update) biomeTheme.update(dt, world.time);   // a theme may animate itself (e.g. neon pulse)
     var n = Weather.night;
-    Music.setMood(Weather.space > 0.5 ? 'space' : n > 0.6 ? 'night' : n < 0.4 ? 'day' : null);
-    if (Weather.space !== bdMix) {
-      bdMix = Weather.space;
-      backdrop.material.color.setHex(CONFIG.COLORS.grassB).lerp(bdSpace, bdMix);
+    var tm = Weather.themeMix, tname = Weather.themeName;
+    var themeMood = tm > 0.5 && tname ? Biome.theme(tname).musicMood : null;
+    Music.setMood(themeMood || (n > 0.6 ? 'night' : n < 0.4 ? 'day' : null));
+    if (tm !== bdMix) {
+      bdMix = tm;
+      backdrop.material.color.setHex(CONFIG.COLORS.grassB);
+      var bdT = tname ? Biome.theme(tname).backdrop : undefined;
+      if (bdT !== undefined) backdrop.material.color.lerp(bdColor.setHex(bdT), tm);
     }
     wxTimer -= dt;
     if (wxTimer <= 0) { wxTimer = 0.6; el.wxBadge.textContent = Weather.label(); }

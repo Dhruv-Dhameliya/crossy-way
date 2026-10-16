@@ -1,0 +1,51 @@
+/* Space biome page styling. Everything here only applies while the chicken is in
+   space (game.js sets <body data-biome="space">), so the Forest looks exactly as before. */
+
+/* a neon vignette with faint scan lines over the whole game */
+body[data-biome="space"] #gameContainer::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 52%, rgba(255, 43, 214, 0.20) 100%),
+    radial-gradient(ellipse at 0% 100%, rgba(0, 229, 255, 0.16), rgba(0, 0, 0, 0) 45%),
+    radial-gradient(ellipse at 100% 0%, rgba(162, 77, 255, 0.18), rgba(0, 0, 0, 0) 45%),
+    repeating-linear-gradient(0deg, rgba(0, 229, 255, 0.04) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
+  mix-blend-mode: screen;
+  animation: space-pulse 5s ease-in-out infinite alternate;
+}
+@keyframes space-pulse { from { opacity: 0.75; } to { opacity: 1; } }
+
+/* neon HUD */
+body[data-biome="space"] #score {
+  color: #ffffff;
+  text-shadow: 0 0 10px #00e5ff, 0 0 24px #00e5ff, 0 0 40px #ff2bd6;
+}
+body[data-biome="space"] .best-box {
+  background: rgba(10, 6, 40, 0.65);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.6), inset 0 0 8px rgba(0, 229, 255, 0.25);
+  border: 1px solid rgba(0, 229, 255, 0.7);
+}
+body[data-biome="space"] .best-box .best-mode { background: rgba(255, 43, 214, 0.3); }
+body[data-biome="space"] .coin-box {
+  background: linear-gradient(rgba(20, 8, 70, 0.9), rgba(8, 4, 40, 0.9));
+  border-color: #00e5ff;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.7), inset 0 0 10px rgba(255, 43, 214, 0.35);
+}
+body[data-biome="space"] .corner-buttons button,
+body[data-biome="space"] #pauseBtn {
+  box-shadow: 0 0 14px rgba(162, 77, 255, 0.9), 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+body[data-biome="space"] .combo {
+  box-shadow: 0 0 16px rgba(255, 43, 214, 0.8), 0 4px 0 rgba(0, 0, 0, 0.25);
+}
+body[data-biome="space"] #toast > *, body[data-biome="space"] .toast {
+  box-shadow: 0 0 22px rgba(0, 229, 255, 0.85), 0 0 8px rgba(255, 43, 214, 0.7);
+}
+body[data-biome="space"] .go-card {
+  border-color: #00e5ff;
+  box-shadow: 0 0 26px rgba(0, 229, 255, 0.7), 0 0 60px rgba(255, 43, 214, 0.35), 0 8px 0 rgba(0, 0, 0, 0.25);
+}
+body[data-biome="space"] #wxBadge { filter: drop-shadow(0 0 6px #00e5ff); }
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-biome="space"] #gameContainer::after { animation: none; }
+}
