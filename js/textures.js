@@ -39,6 +39,67 @@ var Textures = (function () {
     }
   }
 
+  // Tiny stars. A texel is twice as wide as it is tall once stretched over the
+  // lane, so each star is drawn s wide and 2s tall to come out square.
+  function stars(ctx, w, h, seed, count, alpha) {
+    var r = rng(seed);
+    for (var i = 0; i < count; i++) {
+      var s = r() < 0.12 ? 3 : r() < 0.4 ? 2 : 1;
+      var warm = r();
+      ctx.fillStyle = warm < 0.18 ? 'rgba(143,244,255,' : warm < 0.3 ? 'rgba(255,190,240,' : 'rgba(255,255,255,';
+      ctx.fillStyle += (alpha * (0.45 + r() * 0.55)).toFixed(2) + ')';
+      ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), s, s * 2);
+    }
+  }
+
+  // Empty space instead of a river: deep blue-black, nebula haze, drifting stars.
+  function spaceVoidTexture(base) {
+    var tex = makeTexture(128, 128, function (ctx, w, h) {
+      ctx.fillStyle = hexCss(base);
+      ctx.fillRect(0, 0, w, h);
+      var r = rng(41 + (base & 255));
+      for (var i = 0; i < 3; i++) {                       // nebula wisps
+        var cx = r() * w, cy = r() * h, rad = 30 + r() * 30;
+        var g = ctx.createRadialGradient(cx, cy, 2, cx, cy, rad);
+        var col = i % 2 ? '120,70,230' : '40,120,220';
+        g.addColorStop(0, 'rgba(' + col + ',0.22)');
+        g.addColorStop(1, 'rgba(' + col + ',0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+      }
+      stars(ctx, w, h, 77 + (base & 255), 46, 0.95);
+      // a couple of bright twinkles
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      for (var k = 0; k < 2; k++) {
+        var sx = Math.floor(r() * (w - 8)) + 4, sy = Math.floor(r() * (h - 8)) + 4;
+        ctx.fillRect(sx - 3, sy, 7, 2);
+        ctx.fillRect(sx, sy - 3, 2, 7);
+      }
+    });
+    waterTextures.push(tex);
+    return tex;
+  }
+
+  // The chasm lane in space: a black hole's glowing accretion swirl.
+  function blackHoleTexture(base, accent) {
+    var tex = makeTexture(128, 128, function (ctx, w, h) {
+      ctx.fillStyle = hexCss(base);
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = hexCss(accent);
+      ctx.lineWidth = 3;
+      for (var i = 0; i < 4; i++) {
+        ctx.globalAlpha = 0.5 - i * 0.1;
+        ctx.beginPath();
+        ctx.ellipse(w / 2, h / 2, 54 - i * 12, 26 - i * 5, 0, 0.4 + i, 4.6 + i);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      stars(ctx, w, h, 5 + (base & 255), 14, 0.7);
+    });
+    waterTextures.push(tex);
+    return tex;
+  }
+
   // moon = true: add little craters
   function grassTexture(base, moon) {
     return makeTexture(64, 64, function (ctx, w, h) {
@@ -63,11 +124,16 @@ var Textures = (function () {
     return makeTexture(128, 128, function (ctx, w, h) {
       ctx.fillStyle = hexCss(base);
       ctx.fillRect(0, 0, w, h);
-      speckle(ctx, w, h, base, 50, 23 + (base & 255), 0.06);
       if (tech) {
-        ctx.fillStyle = shadeCss(base, 0.12);
+        // a glass walkway: the stars shine through, with a faint panel grid
+        stars(ctx, w, h, 22 + (base & 255), 34, 0.55);
+        ctx.fillStyle = 'rgba(120,220,255,0.16)';
         ctx.fillRect(0, 62, w, 2);
         ctx.fillRect(63, 0, 2, h);
+        ctx.fillStyle = 'rgba(120,220,255,0.07)';
+        ctx.fillRect(0, 0, w, h / 2);
+      } else {
+        speckle(ctx, w, h, base, 50, 23 + (base & 255), 0.06);
       }
       if (edge) {
         // dashed divider on the near edge of the lane (shared with the lane in front)
@@ -175,11 +241,11 @@ var Textures = (function () {
       tex.repeat.set(tiles / 2, 1);
       side = C.roadSide;
     } else if (type === CONFIG.ROW_TYPES.WATER && variant === 'void') {
-      tex = waterTexture(parity ? C.voidA : C.voidB, C.voidAccent);
+      tex = space ? blackHoleTexture(parity ? C.voidA : C.voidB, C.voidAccent) : waterTexture(parity ? C.voidA : C.voidB, C.voidAccent);
       tex.repeat.set(tiles / 2, 1);
       side = C.voidSide;
     } else if (type === CONFIG.ROW_TYPES.WATER) {
-      tex = waterTexture(parity ? C.waterA : C.waterB, space ? C.waterAccent : undefined);
+      tex = space ? spaceVoidTexture(parity ? C.waterA : C.waterB) : waterTexture(parity ? C.waterA : C.waterB);
       tex.repeat.set(tiles / 2, 1);
       side = C.waterSide;
     } else {

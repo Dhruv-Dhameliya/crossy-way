@@ -199,7 +199,7 @@ World.prototype.populateGrass = function (row, z, p) {
       }
     });
   }
-  if (boxes.length) row.group.add(Utils.voxelMesh(boxes, { material: Models.sceneryMaterial() })); // sways in the wind
+  if (boxes.length) row.group.add(Utils.voxelMesh(boxes, { material: row.biome === 'space' ? Utils.voxelMaterial() : Models.sceneryMaterial() })); // trees sway in the wind (there is none in space)
 
   if (z > 0) {
     var r = Math.random();
@@ -355,8 +355,9 @@ World.prototype.laneStep = function (row, dt) {
       v.mesh.position.x = v.x;
       // a little suspension bounce and body roll, livelier the faster they go
       var tm = this.time, sp = Math.min(1.5, v.cur / 4);
-      v.mesh.position.y = row.top + Math.sin(tm * (7 + v.cur * 0.8) + v.ph) * 0.012 * sp;
-      v.mesh.rotation.z = Math.sin(tm * (5 + v.cur * 0.5) + v.ph * 1.7) * 0.014 * sp;
+      var hover = row.biome === 'space';   // ships float: a slow bob and roll instead of road bumps
+      v.mesh.position.y = row.top + (hover ? 0.1 + Math.sin(tm * 2.4 + v.ph) * 0.05 : Math.sin(tm * (7 + v.cur * 0.8) + v.ph) * 0.012 * sp);
+      v.mesh.rotation.z = hover ? Math.sin(tm * 1.7 + v.ph * 1.7) * 0.03 : Math.sin(tm * (5 + v.cur * 0.5) + v.ph * 1.7) * 0.014 * sp;
     }
   }
   if (frozen) return; // no new traffic while time is frozen
@@ -692,6 +693,10 @@ World.prototype.update = function (dt, centerZ, playerZ, budget) {
         l.mesh.position.y = l.baseY + l.bob - l.dip - (l.sink || 0) + (l.wob || 0);
         l.curTop = l.top + l.bob - l.dip - (l.sink || 0) + (l.wob || 0); // what the chicken stands on
         if (l.pad || l.turtle || l.platform) l.mesh.rotation.z = Math.sin(time * 1.6 + l.phase) * 0.02;
+        else if (row.biome === 'space' && !l.croc) { // drifting space rock: a slow lazy roll
+          l.mesh.rotation.z = Math.sin(time * 0.7 + l.phase) * 0.035;
+          l.mesh.rotation.x = Math.sin(time * 0.5 + l.phase * 1.3) * 0.02;
+        }
       }
     } else if (row.type === T.RAIL) {
       self.updateTrain(row, dt, vol);
@@ -713,7 +718,7 @@ World.prototype.updateTurtle = function (row, l, dt, time) {
   l.submerged = l.sink > 0.3;
   if (tt >= diveStart && tt < riseStart && !l.bubbled) {
     l.bubbled = true;
-    Particles.burst(l.x, row.top + 0.02, row.z, { colors: [0xffffff, 0xcfeeff, 0x9be0ff], count: 8, speed: 1.4, up: 2.2, size: 0.09, life: 0.6, gravity: 2, spread: l.halfWidth, floor: row.top });
+    Particles.burst(l.x, row.top + 0.02, row.z, { colors: row.biome === 'space' ? [0xffffff, 0x7df3ff, 0xff8a3d] : [0xffffff, 0xcfeeff, 0x9be0ff], count: 8, speed: 1.4, up: 2.2, size: 0.09, life: 0.6, gravity: 2, spread: l.halfWidth, floor: row.top });
   } else if (tt < warnStart) l.bubbled = false;
 };
 
@@ -750,7 +755,7 @@ World.prototype.checkCrocHit = function (x, z) {
 // What happens to a chicken that ends up in this water lane: drown, or fall into the chasm.
 World.prototype.drownType = function (z) {
   var row = this.rows.get(z);
-  return row && row.void ? 'fall' : 'drown';
+  return row && (row.void || row.biome === 'space') ? 'fall' : 'drown';
 };
 
 World.prototype.isIce = function (x, z) {

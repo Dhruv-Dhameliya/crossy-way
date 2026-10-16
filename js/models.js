@@ -827,6 +827,8 @@ var Models = (function () {
   var CROC_HEAD = 1.0; // length of the dangerous head at the front
 
   function buildCroc(length, biome) {
+    var bm = biomeOf(biome);
+    if (bm && bm.croc) return bm.croc(length);
     var pal = CROC_PAL[biome] || CROC_PAL.forest;
     var g = new THREE.Group();
     var L = length, bodyLen = L - CROC_HEAD + 0.2, cx = -L / 2 + bodyLen / 2;

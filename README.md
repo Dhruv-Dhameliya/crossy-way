@@ -66,7 +66,7 @@ Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, 
 
 ## Biomes 🚀
 
-The world has more than one look. Run far enough in the **Forest** and a portal carries you into **Space**: crystals, crates and radar dishes block your way, hover cars and maglev trains replace the traffic, rivers glow with energy, and your chicken puts on an **astronaut helmet**. It's the same game — only the design and the obstacles change — and the night sky fills with drifting dust and meteors (rain becomes a **meteor shower**). In Settings → World you can pick **Auto** (Forest → Space → Forest…), or lock **Forest** or **Space**.
+The world has more than one look. Run far enough in the **Forest** and a portal carries you into **Space**: the roads become glass walkways with **spaceships** flying over them (fighters, freighters, liners, saucers, asteroid miners, even a flying ice-cream UFO), the rivers become **empty space** that you cross on **broken asteroid chunks** and drifting **satellites** (which power down!), crocodiles become **void worms**, and chasms become **black holes** crossed on wrecked hull plates. Rockets, crystals, monoliths, stranded astronauts, habitat domes, supply crates and little aliens block your way, and your chicken puts on an **astronaut helmet**. It's the same game — only the design and the obstacles change — and the sky fills with drifting dust and meteors (rain becomes a **meteor shower**). In Settings → World you can pick **Auto** (Forest → Space → Forest…), or lock **Forest** or **Space**.
 
 ## Share your score 📸
 

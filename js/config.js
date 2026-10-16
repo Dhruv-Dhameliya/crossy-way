@@ -115,11 +115,11 @@ CONFIG.BIOME_COLORS = {
   space: {
     sky: 0x120f2e,
     grassA: 0x6f6c92, grassB: 0x66638a, grassSide: 0x3f3d62,
-    roadA: 0x23273f, roadB: 0x1e2237, roadSide: 0x12142a, roadLine: 0x4de8ff,
-    waterA: 0x6a3cff, waterB: 0x5a2fe0, waterSide: 0x2c1a80, waterAccent: 0x8ff4ff,
+    roadA: 0x1f2d5c, roadB: 0x1a2750, roadSide: 0x080b26, roadLine: 0x4de8ff,
+    waterA: 0x070a26, waterB: 0x050820, waterSide: 0x02030f, waterAccent: 0x8ff4ff,
     railBedA: 0x3a3f5c, railBedB: 0x343955, railSide: 0x1d2038, sleeper: 0x2fd4e8, rail: 0xaef6ff,
     iceA: 0x9fe9ff, iceB: 0x8adcf5, iceSide: 0x4aa3c8,
-    voidA: 0x050610, voidB: 0x03040b, voidSide: 0x000000, voidAccent: 0x8f6bff,
+    voidA: 0x030308, voidB: 0x020206, voidSide: 0x000000, voidAccent: 0xff8a3d,
     coin: CONFIG.COLORS.coin, coinDark: CONFIG.COLORS.coinDark, coinShine: CONFIG.COLORS.coinShine,
     backdrop: 0x2a2750
   }
