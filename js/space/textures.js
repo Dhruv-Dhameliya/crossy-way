@@ -129,7 +129,7 @@ var SpaceTextures = (function () {
     return tex;
   }
 
-  // theme.ground hook: which texture a lane gets in space. Ice uses the shared ice texture.
+  // theme.ground hook: which texture a lane gets in space. The grass-lane variants (ice, dust, belts, pads) use the shared textures.
   var cache = {};
   function ground(_kit, type, parity, edge, variant, tiles, C) {
     var key = type + ':' + parity + ':' + (variant || '');       // (the divider flag `edge` doesn't change the look here)
@@ -139,7 +139,7 @@ var SpaceTextures = (function () {
 
   function build(type, parity, variant, tiles, C) {
     var T = CONFIG.ROW_TYPES, tex, side;
-    if (type === T.GRASS && variant === 'ice') return null;
+    if (type === T.GRASS && variant) return null;                  // ice, moon dust, conveyors and jump pads use the shared textures (with this theme's palette)
     if (type === T.GRASS) { tex = techGroundTexture(parity ? C.grassA : C.grassB, parity ? C.neonA : C.neonB); tex.repeat.set(tiles, 1); side = C.grassSide; }
     else if (type === T.ROAD) { tex = energyBridgeTexture(parity ? C.roadA : C.roadB, C.roadLine); tex.repeat.set(tiles / 2, 1); side = C.roadSide; }
     else if (type === T.WATER && variant === 'void') { tex = blackHoleTexture(parity ? C.voidA : C.voidB, C.voidAccent); tex.repeat.set(tiles / 2, 1); side = C.voidSide; }

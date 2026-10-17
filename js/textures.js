@@ -2,7 +2,8 @@
 // sleepers, grass grain and water ripples are painted into small tileable
 // textures shared by every row of that kind, so a lane is a single mesh.
 // Every biome has its own palette (and may paint its own textures); a lane can also be a
-// variant: frozen "ice" (a grass lane) or a dark "void" (a water-type lane).
+// variant: frozen "ice", sticky "mud", a "beltL" / "beltR" conveyor or a "bounce" trampoline
+// (all grass lanes), or a dark "void" (a water-type lane).
 var Textures = (function () {
   var materialCache = {};
   var geometryCache = {};
@@ -129,6 +130,62 @@ var Textures = (function () {
     });
   }
 
+
+  // sticky mud: churned brown ground with a few glossy puddles
+  function mudTexture(base, puddle) {
+    return makeTexture(64, 64, function (ctx, w, h) {
+      ctx.fillStyle = hexCss(base);
+      ctx.fillRect(0, 0, w, h);
+      speckle(ctx, w, h, base, 34, 17 + (base & 255), 0.14);
+      var r = rng(29 + (base & 255));
+      ctx.fillStyle = shadeCss(base, -0.2);
+      for (var i = 0; i < 4; i++) ctx.fillRect(Math.floor(r() * 14) * 4, Math.floor(r() * 14) * 4, 8 + Math.floor(r() * 3) * 4, 6);
+      ctx.fillStyle = hexCss(puddle);
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(Math.floor(r() * 9) * 4 + 4, Math.floor(r() * 12) * 4 + 4, 16, 8);
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.45;
+      ctx.fillRect(Math.floor(r() * 9) * 4 + 6, Math.floor(r() * 12) * 4 + 6, 6, 2);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  // conveyor belt: dark rubber with amber chevrons that point the way it carries you
+  // (the tile is one world unit square). The texture scrolls, see update().
+  var beltTextures = [];
+  function beltTexture(base, arrow, dir) {
+    var tex = makeTexture(64, 64, function (ctx, w, h) {
+      ctx.fillStyle = hexCss(base);
+      ctx.fillRect(0, 0, w, h);
+      speckle(ctx, w, h, base, 16, 41 + (base & 255), 0.06);
+      ctx.fillStyle = shadeCss(base, -0.18);                         // belt edges
+      ctx.fillRect(0, 0, w, 6);
+      ctx.fillRect(0, h - 6, w, 6);
+      ctx.fillStyle = hexCss(arrow);                                 // a chevron pointing to +u
+      ctx.beginPath();
+      ctx.moveTo(14, 14); ctx.lineTo(34, 32); ctx.lineTo(14, 50); ctx.lineTo(24, 50); ctx.lineTo(44, 32); ctx.lineTo(24, 14);
+      ctx.closePath(); ctx.fill();
+    });
+    tex.__beltDir = dir;
+    beltTextures.push(tex);
+    return tex;
+  }
+
+  // trampoline lane: a taut bouncy surface with a ring and a spring dot on every tile
+  function bounceTexture(base, ring) {
+    return makeTexture(64, 64, function (ctx, w, h) {
+      ctx.fillStyle = hexCss(base);
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = shadeCss(base, -0.14);
+      ctx.fillRect(0, 0, w, 3); ctx.fillRect(0, h - 3, w, 3);
+      ctx.strokeStyle = hexCss(ring);
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(w / 2, h / 2, 21, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = hexCss(ring);
+      ctx.fillRect(w / 2 - 5, h / 2 - 5, 10, 10);
+    });
+  }
+
   function sideMat(color) {
     var key = 'side:' + color;
     if (!materialCache[key]) {
@@ -167,7 +224,7 @@ var Textures = (function () {
   };
 
   // The ground uses two materials: [sides, top] (see getGroundGeometry).
-  // variant: undefined | 'ice' (on a grass lane) | 'void' (on a water-type lane)
+  // variant: undefined | 'ice' | 'mud' | 'beltL' | 'beltR' | 'bounce' (on a grass lane) | 'void' (on a water-type lane)
   // A biome theme may supply its own ground (theme.ground); returning null falls
   // back to the normal textures below.
   function getGroundMaterials(type, parity, edge, biome, variant) {
@@ -178,6 +235,7 @@ var Textures = (function () {
     var tiles = CONFIG.GROUND_VISUAL_HALF * 2 + 1;
     var tex, side;
     var T = Biome.theme(biome);
+    var P = function (k) { return C[k] !== undefined ? C[k] : CONFIG.BIOME_COLORS.forest[k]; };   // (a theme only needs to paint what it changes)
     var custom = T.ground ? T.ground(kit, type, parity, edge, variant, tiles, C) : null;
     if (custom) {
       tex = custom.tex;
@@ -186,6 +244,18 @@ var Textures = (function () {
       tex = iceTexture(parity ? C.iceA : C.iceB);
       tex.repeat.set(tiles, 1);
       side = C.iceSide;
+    } else if (type === CONFIG.ROW_TYPES.GRASS && variant === 'mud') {
+      tex = mudTexture(parity ? P('mudA') : P('mudB'), P('mudPuddle'));
+      tex.repeat.set(tiles, 1);
+      side = P('mudSide');
+    } else if (type === CONFIG.ROW_TYPES.GRASS && (variant === 'beltL' || variant === 'beltR')) {
+      tex = beltTexture(parity ? P('beltA') : P('beltB'), P('beltArrow'), variant === 'beltR' ? 1 : -1);
+      tex.repeat.set(tiles, 1);
+      side = P('beltSide');
+    } else if (type === CONFIG.ROW_TYPES.GRASS && variant === 'bounce') {
+      tex = bounceTexture(parity ? P('bounceA') : P('bounceB'), P('bounceRing'));
+      tex.repeat.set(tiles, 1);
+      side = P('bounceSide');
     } else if (type === CONFIG.ROW_TYPES.GRASS) {
       tex = grassTexture(parity ? C.grassA : C.grassB);
       tex.repeat.set(tiles, 1);
@@ -222,6 +292,10 @@ var Textures = (function () {
   function update(t) {
     for (var i = 0; i < waterTextures.length; i++) {
       waterTextures[i].offset.x = (t * 0.015) % 1;
+    }
+    // conveyor chevrons slide the way the belt carries you (one tile = one texture)
+    for (var j = 0; j < beltTextures.length; j++) {
+      beltTextures[j].offset.x = (-beltTextures[j].__beltDir * t * CONFIG.BELT_SPEED) % 1;
     }
   }
 

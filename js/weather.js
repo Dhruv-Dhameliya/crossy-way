@@ -14,6 +14,7 @@ var Weather = (function () {
 
   var scene, ambient, sun, bgColor;
   var timeMode = 'auto', weatherMode = 'auto';
+  var forced = { tod: null, wx: null };   // a run modifier can force the time of day / weather (setForced)
   var cur = null;            // smoothed values actually applied
   var rain = 0, fog = 0;     // current intensities 0..1
   var target = { rain: 0, fog: 0 };
@@ -106,6 +107,11 @@ var Weather = (function () {
     timeMode = tod; weatherMode = wx;
   }
 
+  // A run modifier (Night Shift, Pea Soup) overrides the player's settings for the run; null = no override.
+  function setForced(tod, wx) {
+    forced.tod = tod || null; forced.wx = wx || null;
+  }
+
   // Which biome the chicken is in; the sky blends over about a second.
   function setBiome(name, snap) {
     var T = Biome.theme(name);
@@ -123,8 +129,9 @@ var Weather = (function () {
   }
 
   function timeOfDay(rows) {
-    if (timeMode === 'day') return 0.08;
-    if (timeMode === 'night') return 0.74;
+    var tm = forced.tod || timeMode;
+    if (tm === 'day') return 0.08;
+    if (tm === 'night') return 0.74;
     return (rows % CYCLE_ROWS) / CYCLE_ROWS;
   }
 
@@ -133,9 +140,10 @@ var Weather = (function () {
     rainCount = level === 'high' ? 480 : level === 'medium' ? 300 : 180;
 
     // ---- weather schedule ----
-    if (weatherMode === 'clear') { target.rain = 0; target.fog = 0; }
-    else if (weatherMode === 'rain') { target.rain = 1; target.fog = 0.25; }
-    else if (weatherMode === 'fog') { target.rain = 0; target.fog = 1; }
+    var wm = forced.wx || weatherMode;
+    if (wm === 'clear') { target.rain = 0; target.fog = 0; }
+    else if (wm === 'rain') { target.rain = 1; target.fog = 0.25; }
+    else if (wm === 'fog') { target.rain = 0; target.fog = 1; }
     else if (rows >= nextChange) pickAutoWeather(rows);
     var rate = 0.3 * dt;
     rain += Utils.clamp(target.rain - rain, -rate, rate);
@@ -245,6 +253,7 @@ var Weather = (function () {
   return {
     init: init,
     setModes: setModes,
+    setForced: setForced,
     setBiome: setBiome,
     strike: strike,
     reset: reset,

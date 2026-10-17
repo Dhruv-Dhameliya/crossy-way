@@ -182,6 +182,35 @@ var GameAudio = (function () {
   var hopStep = 0;
   var ambKey = '';
 
+  // Hop sound packs (bought in the shop): each one is a different synthesized "hop".
+  var hopPack = 'classic';
+  var HOP_PACKS = {
+    boing: function () {
+      var f = 250 + Math.random() * 40;
+      tone(f, 0.2, 'sine', 0.11, { freqEnd: f * 2.6, vibrato: 16 });
+      tone(f * 2, 0.14, 'triangle', 0.04, { freqEnd: f * 4, delay: 0.02 });
+    },
+    pop: function () {
+      noise(0.05, 0.2, { filter: 'bandpass', freq: 1800, freqEnd: 700, q: 1.6, attack: 0.002 });
+      tone(820 + Math.random() * 120, 0.08, 'sine', 0.12, { freqEnd: 220 });
+    },
+    squeak: function () {
+      var f = 1500 + Math.random() * 250;
+      tone(f, 0.07, 'triangle', 0.08, { freqEnd: f * 1.5 });
+      tone(f * 1.25, 0.06, 'sine', 0.05, { freqEnd: f * 1.9, delay: 0.06 });
+    },
+    chirp: function () {
+      var f = 2200 + Math.random() * 400;
+      tone(f, 0.05, 'sine', 0.06, { freqEnd: f * 1.35 });
+      tone(f * 1.2, 0.07, 'sine', 0.055, { freqEnd: f * 0.8, delay: 0.055 });
+    },
+    blip: function () {
+      var f = 523 * Math.pow(1.122, (hopStep++ % 4) * 2);
+      tone(f, 0.05, 'square', 0.045);
+      tone(f * 1.5, 0.07, 'square', 0.04, { delay: 0.045 });
+    }
+  };
+
   return {
     setEnabled: function (v) {
       enabled = v;
@@ -213,7 +242,9 @@ var GameAudio = (function () {
     masterNode: function () { return master; },
 
     // ---- chicken ----
+    setHopPack: function (id) { hopPack = HOP_PACKS[id] ? id : 'classic'; },
     hop: function () {
+      if (HOP_PACKS[hopPack]) { HOP_PACKS[hopPack](); return; }
       var f = 380 + (hopStep++ % 3) * 18 + Math.random() * 30;
       tone(f, 0.09, 'square', 0.045, { freqEnd: f * 1.55 });
       tone(f * 0.5, 0.07, 'triangle', 0.05, { freqEnd: f * 0.7 });
@@ -430,6 +461,68 @@ var GameAudio = (function () {
       tone(95, 0.45, 'sawtooth', 0.06, { vol: vol, freqEnd: 70, vibrato: 22, attack: 0.05 });
       noise(0.3, 0.05, { vol: vol, freq: 500, freqEnd: 200, attack: 0.05 });
     },
+    // ---- lane twists ----
+    // a trampoline flings you two rows forward
+    bounce: function () {
+      tone(190, 0.32, 'sine', 0.12, { freqEnd: 950, vibrato: 12 });
+      tone(380, 0.26, 'triangle', 0.06, { freqEnd: 1500, delay: 0.04 });
+      noise(0.12, 0.05, { filter: 'bandpass', freq: 900, freqEnd: 2400, q: 0.9 });
+    },
+    // pulling a foot out of the mud
+    squelch: function () {
+      noise(0.2, 0.2, { filter: 'bandpass', freq: 380, freqEnd: 140, q: 1.2, attack: 0.02 });
+      tone(150, 0.14, 'sine', 0.07, { freqEnd: 70 });
+    },
+
+    // ---- death animations (shop) ----
+    poof: function () {
+      noise(0.32, 0.14, { freq: 1000, freqEnd: 200, attack: 0.01 });
+      tone(320, 0.16, 'sine', 0.08, { freqEnd: 80 });
+    },
+    tada: function () {
+      [523, 659, 784, 1047].forEach(function (f, i) {
+        tone(f, 0.16, 'square', 0.045, { delay: i * 0.06 });
+        tone(f * 2, 0.14, 'sine', 0.025, { delay: i * 0.06 });
+      });
+      noise(0.35, 0.06, { filter: 'highpass', freq: 5000, delay: 0.2 });
+    },
+    whirl: function () {
+      tone(300, 0.7, 'sine', 0.09, { freqEnd: 1500, vibrato: 14 });
+      tone(450, 0.7, 'triangle', 0.05, { freqEnd: 2200, delay: 0.05 });
+      tone(1500, 0.14, 'sine', 0.05, { freqEnd: 400, delay: 0.72 });
+    },
+    ghostOoo: function () {
+      tone(520, 0.95, 'sine', 0.07, { freqEnd: 260, vibrato: 8, attack: 0.12 });
+      tone(780, 0.95, 'sine', 0.04, { freqEnd: 390, vibrato: 8, attack: 0.12 });
+    },
+    rocket: function () {
+      noise(1.0, 0.2, { freq: 500, freqEnd: 3500, attack: 0.15 });
+      tone(120, 0.9, 'sawtooth', 0.07, { freqEnd: 650 });
+    },
+
+    // ---- more rare events ----
+    // a little drone buzzing past (vol: distance)
+    drone: function (vol) {
+      tone(140, 2.6, 'sawtooth', 0.035, { vol: vol, vibrato: 30, attack: 0.4, freqEnd: 175 });
+      tone(280, 2.6, 'square', 0.014, { vol: vol, vibrato: 34, attack: 0.4, freqEnd: 350 });
+    },
+    crateLand: function () {
+      noise(0.12, 0.18, { freq: 500, freqEnd: 150 });
+      tone(110, 0.14, 'triangle', 0.1, { freqEnd: 60 });
+    },
+    crateOpen: function () {
+      [784, 988, 1175, 1568].forEach(function (f, i) {
+        tone(f, 0.16, 'square', 0.045, { delay: i * 0.05 });
+        tone(f, 0.22, 'sine', 0.05, { delay: i * 0.05 });
+      });
+    },
+    // a firework: a rising whistle, then the bang and the crackle
+    firework: function (vol) {
+      tone(520, 0.5, 'sine', 0.04, { vol: vol, freqEnd: 2200, attack: 0.05 });
+      noise(0.4, 0.2, { vol: vol, delay: 0.5, freq: 3500, freqEnd: 500, attack: 0.003 });
+      for (var i = 0; i < 6; i++) noise(0.05, 0.07, { vol: vol, delay: 0.55 + i * 0.06, filter: 'highpass', freq: 4000 });
+    },
+
     portal: function () {
       [392, 523, 659, 880, 1175].forEach(function (f, i) {
         tone(f, 0.4, 'sine', 0.05, { delay: i * 0.08 });

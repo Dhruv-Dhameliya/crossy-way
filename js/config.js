@@ -61,6 +61,11 @@ var CONFIG = {
     blast:  { label: 'BLAST', icon: '💣', color: '#ff7a1a', dur: 0, weight: 0.17 }
   },
 
+  // Timed boosts that are not power-ups (never picked up from the ground): they use the same pills.
+  BOOSTS: {
+    fireworks: { label: 'COMBO BOOST', icon: '🎆', color: '#ff5fa8', dur: 8, weight: 0 }
+  },
+
   BEST_SCORE_KEY: 'crossy_way_best_score',
   COINS_KEY: 'crossy_way_total_coins',
   LEAN_KEY: 'crossy_way_camera_lean',
@@ -82,6 +87,11 @@ var CONFIG = {
     extreme: { label: 'Extreme', icon: '💀', speed: 1.5,  traffic: 1.5,  train: 0.5,  trainWarn: 1.3, eagle: 6,   ramp: 100, special: 1.6, spread: 0.55, blurb: 'Flat-out speed, packed roads, constant trains, and the eagle after only 6 seconds!' }
   },
 
+  // Lane twists (all on grass lanes): conveyor belts push you sideways, mud slows the hop you
+  // start from it, and trampoline lanes fling you two rows forward.
+  BELT_SPEED: 1.5,          // tiles per second a conveyor lane carries the chicken
+  MUD_HOP: 0.34,            // seconds a hop takes when it starts on mud (a normal hop takes HOP_DURATION)
+
   DPAD_KEY: 'crossy_way_dpad',
   DPAD_SWAP_KEY: 'crossy_way_dpad_swap',
   BIOME_KEY: 'crossy_way_biome',
@@ -99,7 +109,8 @@ var Difficulty = {
     try { m = localStorage.getItem(CONFIG.DIFF_KEY); } catch (e) { /* private mode */ }
     return CONFIG.DIFFICULTY[m] ? m : 'medium';
   })(),
-  get cur() { return CONFIG.DIFFICULTY[this.mode]; }
+  // (a run modifier may change some of the numbers, see mutators.js)
+  get cur() { var d = CONFIG.DIFFICULTY[this.mode]; return Mutators.cur ? Mutators.apply(this.mode, d) : d; }
 };
 
 // ---------------------------------------------------------------------------
@@ -127,6 +138,9 @@ CONFIG.BIOME_COLORS = {
   forest: Object.assign({}, CONFIG.COLORS, {
     iceA: 0xcdeffa, iceB: 0xbfe6f5, iceSide: 0x8fc4d8,
     voidA: 0x231b15, voidB: 0x1b1410, voidSide: 0x0d0907, voidAccent: 0xff8a3d,
+    mudA: 0x7a5a3a, mudB: 0x6e5033, mudSide: 0x45301c, mudPuddle: 0x93b9c9,
+    beltA: 0x4b4f5a, beltB: 0x444853, beltSide: 0x2c2f38, beltArrow: 0xffc233,
+    bounceA: 0xd264b8, bounceB: 0xc457aa, bounceSide: 0x7d2f6b, bounceRing: 0xffe9f7,
     backdrop: CONFIG.COLORS.grassB
   })
 };

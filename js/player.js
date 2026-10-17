@@ -1,6 +1,8 @@
 // The voxel chicken: grid hopping with squash & stretch, gliding on ice, riding
-// logs and platforms, coin pickup and every way to die (car, train, drowning,
-// a crocodile, falling into a chasm, the eagle).
+// logs and platforms, being carried by conveyor belts, bouncing on trampoline lanes,
+// slogging through mud, coin pickup and every way to die (car, train, drowning,
+// a crocodile, falling into a chasm, the eagle). Also owns the shop's companions
+// (the pet and the aura) and plays the worn death animation.
 function Player(scene) {
   this.scene = scene;
   this.group = new THREE.Group();
@@ -71,8 +73,23 @@ function Player(scene) {
   this.jumpRing.renderOrder = 2;
   this.jumpRing.visible = false;
   this.scene.add(this.jumpRing);
+
+  this.onCrate = null;
+  this.onBounce = null;
+  this.aura = new Flair.Aura(scene);
+  this.pet = new Pets.Pet(scene);
+  this.deathFx = null;
+  this.deathFxData = null;
   this.reset();
+  this.refreshFlair();
 }
+
+// Put on the pet and aura picked in the shop (and bring the pet back to the chicken's side).
+Player.prototype.refreshFlair = function () {
+  this.aura.set(Cosmetics.eqId('aura'));
+  this.pet.setKind(Cosmetics.eqId('pet'));
+  this.pet.reset(this);
+};
 
 // 0 = none, 1 = Jump (hop over small obstacles), 2 = Skip Lane (two tiles at once)
 Player.prototype.setJump = function (level) {
@@ -207,6 +224,7 @@ Player.prototype.applyLook = function () {
   this.buildModel();
   this.blinkT = -1;
   if (wasGhost) this.setGhost(true);
+  this.refreshFlair();
 };
 
 Player.prototype.reset = function () {
@@ -260,6 +278,9 @@ Player.prototype.reset = function () {
   this.group.scale.set(1, 1, 1);
   this.bodyGroup.rotation.set(0, 0, 0);
   this.eyes[0].scale.y = this.eyes[1].scale.y = 1;
+  this.deathFx = null;
+  this.deathFxData = null;
+  if (this.pet) this.pet.reset(this);
 };
 
 var FACING = { forward: 0, back: Math.PI, left: -Math.PI / 2, right: Math.PI / 2 };
@@ -280,7 +301,8 @@ Player.prototype.requestMove = function (dx, dz, world) {
   this.tryStartHop(dx, dz, world);
 };
 
-Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
+// bounce: 1 or 2 = a trampoline lane flings the chicken that many rows forward (no checks, the caller did them)
+Player.prototype.tryStartHop = function (dx, dz, world, isSlide, bounce) {
   var startX = this.x, startZ = this.z;
   var targetX = Math.round(startX) + dx; // forward/back hops snap to the grid
   var targetZ = startZ + dz;
@@ -293,7 +315,8 @@ Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
   var farOk = !world.isBlocked(farX, farZ) && farZ >= minZ;
   var leap = null;
   // (a glide on ice is a plain step: the caller already checked the tile)
-  if (!isSlide && this.jumpLevel >= 2 && farOk) leap = 'double';
+  if (bounce) { leap = 'bounce'; targetX = Math.round(startX); targetZ = startZ + bounce; }
+  else if (!isSlide && this.jumpLevel >= 2 && farOk) leap = 'double';
   else if (!isSlide && world.isBlocked(targetX, targetZ)) {
     if (this.jumpLevel >= 1 && world.isSmallObstacle(targetX, targetZ) && farOk) leap = 'over';
     else { this.bounce(dx, dz); return; }
@@ -301,9 +324,12 @@ Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
     this.bounce(dx, dz);
     return;
   }
-  if (leap) { targetX = farX; targetZ = farZ; }
-  this.hopDur = isSlide ? 0.2 : leap === 'double' ? 0.27 : leap === 'over' ? 0.22 : CONFIG.HOP_DURATION;
-  this.hopH = isSlide ? 0.04 : leap === 'double' ? 1.05 : leap === 'over' ? 0.85 : CONFIG.HOP_HEIGHT;
+  if (leap && !bounce) { targetX = farX; targetZ = farZ; }
+  // a hop that starts in mud is slow and low; the Moon Hops modifier makes every hop floaty
+  var r0 = world.getRow(Math.round(startZ));
+  var mudStart = !!(r0 && r0.mud) && !isSlide && !leap;
+  this.hopDur = isSlide ? 0.2 : leap === 'bounce' ? 0.38 : leap === 'double' ? 0.27 : leap === 'over' ? 0.22 : mudStart ? CONFIG.MUD_HOP : CONFIG.HOP_DURATION * Mutators.num('hopDur', 1);
+  this.hopH = isSlide ? 0.04 : leap === 'bounce' ? 1.5 : leap === 'double' ? 1.05 : leap === 'over' ? 0.85 : mudStart ? 0.25 : CONFIG.HOP_HEIGHT * Mutators.num('hopH', 1);
   this.hopSlide = !!isSlide;
   if (!isSlide) {
     // a hop that lands on ice keeps gliding: 2 tiles sideways, 1 forward / back
@@ -323,14 +349,51 @@ Player.prototype.tryStartHop = function (dx, dz, world, isSlide) {
   this.onLog = null;
   this.fid.type = null;
   this.fxBurst(startX, this.y, startZ, 6);
-  var r0 = world.getRow(Math.round(startZ));
   if (isSlide) {
     Particles.burst(startX, 0.06, startZ, { colors: [0xffffff, 0xcdeffa, 0x9fe9ff], count: 3, speed: 1.2, up: 0.9, size: 0.08, life: 0.35, gravity: 2, spread: 0.25, floor: 0 });
     if (GameAudio && GameAudio.slide) GameAudio.slide();
   } else {
-    if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ, Biome.theme(r0.biome).puffColors);
-    if (GameAudio) { if (leap) GameAudio.jump(leap); else GameAudio.hop(); }
+    if (mudStart) {
+      var mc = Biome.colors(r0.biome);
+      Particles.burst(startX, this.y + 0.05, startZ, { colors: [mc.mudA !== undefined ? mc.mudA : 0x7a5a3a, mc.mudB !== undefined ? mc.mudB : 0x5c4328], count: 7, speed: 1.3, up: 2.4, size: 0.1, life: 0.5, gravity: 9, spread: 0.3, floor: this.y - 0.1 });
+    } else if (r0 && r0.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(startX, 0.02, startZ, Biome.theme(r0.biome).puffColors);
+    if (leap === 'bounce') {
+      Particles.ring(startX, this.y + 0.04, startZ, 0xffffff, 2.6);
+      if (this.onBounce) this.onBounce();
+    }
+    if (GameAudio) {
+      if (leap === 'bounce') GameAudio.bounce();
+      else if (leap) GameAudio.jump(leap);
+      else if (mudStart) GameAudio.squelch();
+      else GameAudio.hop();
+    }
   }
+};
+
+// Is it safe to land on tile (x, z) about `t` seconds from now? Not blocked, and over a river a
+// log (or platform) must be there by then.
+Player.prototype.safeLanding = function (world, x, z, t) {
+  var row = world.getRow(z);
+  if (!row || world.isBlocked(x, z)) return false;
+  if (row.type !== CONFIG.ROW_TYPES.WATER) return true;
+  for (var i = 0; i < row.logs.length; i++) {
+    var l = row.logs[i];
+    if (!l.submerged && Math.abs(l.x + (l.vx || 0) * t - x) < l.halfWidth - 0.05) return true;
+  }
+  return false;
+};
+
+// A trampoline lane flings the chicken two rows forward (one if the far tile is not safe), over
+// whatever lies between: a free Skip Lane that you cannot refuse, but it never throws you into
+// open water. True if it launched.
+Player.prototype.trampoline = function (world) {
+  var z = Math.round(this.z), row = world.getRow(z);
+  if (!row || !row.bounce) return false;
+  var x = Math.round(this.x);
+  var n = this.safeLanding(world, x, z + 2, 0.38) ? 2 : this.safeLanding(world, x, z + 1, 0.38) ? 1 : 0;
+  if (!n) return false;
+  this.tryStartHop(0, 1, world, false, n);
+  return true;
 };
 
 // The hop effect from the shop (sparkles, hearts, rainbow...). n particles at a spot.
@@ -369,6 +432,7 @@ Player.prototype.bounce = function (dx, dz) {
 Player.prototype.update = function (dt, world) {
   if (this.dying) {
     this.updateDeath(dt, world);
+    this.pet.update(dt, this);
     return;
   }
   if (!this.alive) return;
@@ -440,8 +504,9 @@ Player.prototype.update = function (dt, world) {
       this.onLanded(world);
       if (!this.dying && this.z > this.maxZ) this.maxZ = this.z;   // a row only counts if you survived the landing
       if (this.onLand) this.onLand();
-      var gliding = !this.dying && this.glide(world);
-      if (!gliding && this.queuedMove && !this.dying) {
+      var launched = !this.dying && this.trampoline(world);
+      var gliding = !this.dying && !launched && this.glide(world);
+      if (!launched && !gliding && this.queuedMove && !this.dying) {
         var qm = this.queuedMove;
         this.queuedMove = null;
         this.tryStartHop(qm.dx, qm.dz, world);
@@ -500,6 +565,11 @@ Player.prototype.update = function (dt, world) {
         this.startDeath(world.drownType(Math.round(this.z)), world); // carried off the edge, or the turtle dived
       }
     } else {
+      var brow = world.getRow(Math.round(this.z));
+      if (brow && brow.belt && !this.bouncing) {            // a conveyor lane carries you sideways
+        this.x = Utils.clamp(this.x + brow.belt * CONFIG.BELT_SPEED * dt, -CONFIG.PLAY_HALF, CONFIG.PLAY_HALF);
+        this.collectHere(world, brow);
+      }
       this.y = world.surfaceY(this.x, this.z) + fAir;
     }
   }
@@ -533,6 +603,9 @@ Player.prototype.update = function (dt, world) {
     jr.scale.setScalar(CONFIG.CHICKEN_SCALE * (1.25 + Math.sin(this.phase * 1.5) * 0.07 - lift * 0.3));
   }
 
+  this.aura.update(dt, this.x + offsetX, this.y - this.air, this.z + offsetZ, this.air, true);
+  this.pet.update(dt, this);
+
   if (!this.dying) this.checkHazards(world);
 };
 
@@ -553,7 +626,13 @@ Player.prototype.onLanded = function (world) {
   } else {
     this.onLog = null;
     if (row.type === CONFIG.ROW_TYPES.GRASS) Particles.puff(this.x, 0.02, this.z, Biome.theme(row.biome).puffColors);
+    Flair.trailStep(this.x, world.surfaceY(this.x, this.z), this.z, this.facing);   // the worn trail (shop)
   }
+  this.collectHere(world, row);
+};
+
+// Pick up whatever lies on the tile the chicken stands on: a coin, a power-up, a supply crate.
+Player.prototype.collectHere = function (world, row) {
   var coin = world.tryCollectCoin(this.x, this.z);
   if (coin) {
     if (GameAudio) GameAudio.coin();
@@ -562,6 +641,8 @@ Player.prototype.onLanded = function (world) {
   }
   var item = world.tryCollectItem(this.x, this.z);
   if (item && this.onItem) this.onItem(item.type, item.x, row.top, this.z);
+  var crate = world.tryCollectCrate(this.x, this.z);
+  if (crate && this.onCrate) this.onCrate(crate, row);
 };
 
 Player.prototype.checkHazards = function (world) {
@@ -605,6 +686,9 @@ Player.prototype.startDeath = function (type, world, hitBy) {
   this.onLog = null;
   this.bodyGroup.rotation.set(0, 0, 0);
   this.wingL.rotation.z = this.wingR.rotation.z = 0;
+  this.aura.update(0, this.x, this.y, this.z, 0, false);   // the aura goes out
+  // the worn death animation (shop) replaces the chicken's own for everything but the eagle / UFO
+  var fx = this.deathFx = type !== 'eagle' ? Flair.deathStyle() : null;
   if (type !== 'eagle') {
     // freeze on the lane we were on, back on the ground (not mid-hop)
     this.z = Math.round(this.z);
@@ -613,12 +697,13 @@ Player.prototype.startDeath = function (type, world, hitBy) {
   }
 
   if (type === 'car' || type === 'train') {
-    if (GameAudio) { GameAudio.squish(); if (type === 'train') GameAudio.crash(); }
+    if (GameAudio && !fx) { GameAudio.squish(); if (type === 'train') GameAudio.crash(); }
+    else if (GameAudio && type === 'train') GameAudio.crash();
     // splat flat along the direction of travel (world X)
     this.group.rotation.y = Math.round(this.group.rotation.y / Math.PI) * Math.PI;
     this.facing = this.group.rotation.y;
     this.deathPush = hitBy ? hitBy.direction * 0.9 : 0;
-    Particles.feathers(this.x, this.y + 0.4, this.z, 16);
+    if (!fx) Particles.feathers(this.x, this.y + 0.4, this.z, 16);
   } else if (type === 'drown') {
     if (GameAudio) GameAudio.splash();
     var wy = CONFIG.ROW_TOP.water;
@@ -635,7 +720,7 @@ Player.prototype.startDeath = function (type, world, hitBy) {
       hitBy.onKill(this);
     } else {
       if (GameAudio && GameAudio.chomp) GameAudio.chomp();
-      Particles.feathers(this.x, this.y + 0.5, this.z, 14);
+      if (!fx) Particles.feathers(this.x, this.y + 0.5, this.z, 14);
     }
   } else if (type === 'eagle' && this.themeAt(world, this.z).attack) {
     this.attackTheme = this.themeAt(world, this.z).attack;   // e.g. a UFO instead of the eagle
@@ -656,12 +741,18 @@ Player.prototype.startDeath = function (type, world, hitBy) {
     this.eaglePhaseT = 0;
     this.updateEagleDeath(0);
   }
+  if (fx) fx.begin(this, type);
   if (this.onDeath) this.onDeath(type);
 };
 
 Player.prototype.updateDeath = function (dt) {
   this.deathTimer += dt;
   var t = this.deathTimer;
+  if (this.deathFx) {
+    this.deathFx.update(this, t, dt);
+    if (t > this.deathFx.duration) this.alive = false;
+    return;
+  }
   if (this.deathType === 'car' || this.deathType === 'train') {
     var flat = Utils.clamp(t / 0.08, 0, 1);
     var e = Utils.easeOutQuad(flat);

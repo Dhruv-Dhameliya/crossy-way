@@ -1,5 +1,5 @@
-// Scene/camera setup, input, scoring (combos), power-ups, shop, missions,
-// weather, music, adaptive quality, game loop and UI.
+// Scene/camera setup, input, scoring (combos), power-ups, run modifiers, shop, missions,
+// rare events, weather, music, adaptive quality, game loop and UI.
 (function () {
   // localStorage can throw (blocked site data, private mode, full): never let that stop the game.
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -39,6 +39,9 @@
 
   // scoring: every new row is worth the combo multiplier; close calls add bonus points
   var score = 0;
+  var scoreRaw = 0;       // score before rounding (a modifier can multiply points by a fraction)
+  var runTime = 0;        // seconds the chicken has been alive in this run (for the Stats page)
+  var lastDeath = null;   // how the last run ended
   var COMBO_WINDOW = 0.85; // seconds allowed between new rows to keep a combo alive
   var combo = { count: 0, mult: 1, timer: 0 };
   var runStats = { coins: 0, near: 0, maxMult: 1, maxCombo: 0 };
@@ -57,7 +60,8 @@
     'startHint', 'combo', 'comboMult', 'comboCount', 'comboBar', 'pops', 'wxBadge', 'heroChick',
     'startShopBtn', 'startMissionsBtn', 'missionDot',
     'shopPanel', 'shopCoins', 'shopPreview', 'shopLook', 'shopGrid', 'shopHint', 'closeShopBtn',
-    'chestBtn', 'chestReveal', 'trophiesPanel', 'trophiesBody', 'trophyCount', 'trophyBar', 'closeTrophiesBtn', 'startTrophiesBtn', 'trophyDot', 'goTrophies',
+    'mutBtn', 'mutPanel', 'mutBody', 'closeMutBtn',
+    'chestBtn', 'chestReveal', 'trophiesPanel', 'trophiesBody', 'trophyCount', 'trophyBar', 'closeTrophiesBtn', 'startTrophiesBtn', 'trophyDot', 'goTrophies', 'ttTitle', 'trophyPane', 'statsPane', 'statsBody',
     'sharePanel', 'shareImg', 'shareNativeBtn', 'shareSaveBtn', 'shareCopyBtn', 'closeShareBtn',
     'missionsPanel', 'missionsBody', 'closeMissionsBtn', 'musicSlider', 'musicPct', 'dpadSizeSlider', 'dpadSizePct', 'dpadSizeReset']
     .forEach(function (id) { el[id] = document.getElementById(id); });
@@ -69,6 +73,7 @@
   el.wxButtons = document.querySelectorAll('.wx-btn');
   el.biomeButtons = document.querySelectorAll('.biome-btn');
   el.shopTabs = document.querySelectorAll('.shop-tab');
+  el.ttTabs = document.querySelectorAll('.tt-tab');
   el.dpadButtons = document.querySelectorAll('.dpad-btn');
   el.dpadOptButtons = document.querySelectorAll('.dpad-opt');
   el.diffButtons = document.querySelectorAll('.diff-btn');
@@ -221,20 +226,31 @@
     Weather.reset(true);
 
     Achievements.init({ onUnlock: onTrophy });
-    Achievements.event('owned', Cosmetics.wardrobeCount(), true);
+    Stats.init();
+    syncShopTrophies();
+    GameAudio.setHopPack(Cosmetics.eqId('hsound'));
     Missions.init({
       onReward: function (n) { giveCoins(n); },
       onComplete: onMissionComplete
     });
 
     Particles.init(scene);
+    Flair.init(scene);
+    Events.init(scene);
     world = new World(scene);
     hookWorld();
     player = new Player(scene);
     player.onCoin = function () { addCoins(1); };
     player.onItem = onItemCollected;
+    player.onCrate = onCrate;
+    player.onBounce = function () {
+      Achievements.event('bounces', 1);
+      Stats.bump('lanes', 'bounces');
+      popText('BOING!', '#ff6fd8');
+      vibrate(20);
+    };
     player.onDeath = onPlayerDeath;
-    player.onLand = function () { camKick = 0.05; Achievements.event('hops', 1); };
+    player.onLand = function () { camKick = 0.05; Achievements.event('hops', 1); Stats.add('hops'); };
     player.onEagleGrab = function () {
       shakeT = 0.4; vibrate([30, 40, 60]);
       el.flash.classList.remove('on'); void el.flash.offsetWidth; el.flash.classList.add('on');
@@ -260,10 +276,10 @@
     window.addEventListener('orientationchange', function () { setTimeout(onResize, 200); });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden && state === 'playing' && !settingsOpen) openModal(el.settingsPanel);
-      if (document.hidden) { Missions.runEnd(); Achievements.flush(); }
+      if (document.hidden) { Missions.runEnd(); Achievements.flush(); Stats.flush(); }
       clock.getDelta();
     });
-    window.addEventListener('pagehide', function () { Achievements.flush(); });
+    window.addEventListener('pagehide', function () { Achievements.flush(); Stats.flush(); });
     window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     setupInput();
     applyTitleFont(lsGet(CONFIG.FONT_KEY) || 'bold');
@@ -275,6 +291,7 @@
     applySwipe(swipeStyle);
     showSection(lsGet(CONFIG.TAB_KEY) || 'game');
     applyDifficulty(Difficulty.mode, true);
+    applyMutator(Mutators.id, true);
     // the stage picker only offers biomes that are installed
     el.biomeButtons.forEach(function (b) {
       var v = b.getAttribute('data-biome');
@@ -387,8 +404,10 @@
     if (state === 'start') {
       state = 'playing';
       document.body.classList.add('in-run');
+      announceMutator();
       idleTimer = 0; // (the camera glides from the title view to the chicken)
-      Missions.runStart();
+      runTime = 0;
+      Missions.runStart({ mut: Mutators.id, diff: Difficulty.mode });
       Achievements.runStart();
       runTrophies = [];
       el.startPanel.classList.add('hidden');
@@ -399,7 +418,7 @@
     unlockAudio();
     if (state === 'gameover' || settingsOpen) return;
     startGameIfNeeded();
-    player.requestMove(dx * CONFIG.INPUT_X_SIGN, dz, world);
+    player.requestMove(dx * CONFIG.INPUT_X_SIGN * (Mutators.has('mirror') ? -1 : 1), dz, world);   // (Mirror World swaps left and right)
   }
 
   // A move in WORLD terms (used by camera-aware swipes).
@@ -407,7 +426,7 @@
     unlockAudio();
     if (state === 'gameover' || settingsOpen) return;
     startGameIfNeeded();
-    player.requestMove(wx, wz, world);
+    player.requestMove(Mutators.has('mirror') ? -wx : wx, wz, world);
   }
 
   var WORLD_MOVES = [[0, 1], [0, -1], [1, 0], [-1, 0]]; // forward, back, +x, -x
@@ -540,8 +559,24 @@
       });
     });
     el.closeMissionsBtn.addEventListener('click', closeModal);
+    el.mutBtn.addEventListener('click', function () {
+      openModal(el.mutPanel, renderMutators);
+      var on = el.mutBody.querySelector('.mut-card.active');
+      if (on) on.scrollIntoView({ block: 'center' });        // (the picked one may be far down the list)
+    });
+    el.closeMutBtn.addEventListener('click', closeModal);
+    el.mutBody.addEventListener('click', function (e) {
+      var b = e.target.closest('.mut-card');
+      if (!b) return;
+      applyMutator(b.getAttribute('data-mut') || null);
+      GameAudio.equip();
+      renderMutators();
+    });
     el.closeTrophiesBtn.addEventListener('click', closeModal);
-    el.startTrophiesBtn.addEventListener('click', function () { openModal(el.trophiesPanel, renderTrophies); });
+    el.startTrophiesBtn.addEventListener('click', function () { openModal(el.trophiesPanel, function () { showTrophyPane('trophies'); }); });
+    el.ttTabs.forEach(function (t) {
+      t.addEventListener('click', function () { showTrophyPane(t.getAttribute('data-pane')); });
+    });
     el.startShopBtn.addEventListener('click', function () { openModal(el.shopPanel, renderShop); });
     el.startMissionsBtn.addEventListener('click', function () { openModal(el.missionsPanel, openMissionsScreen); });
     el.shopTabs.forEach(function (t) {
@@ -707,21 +742,22 @@
 
   // ---- difficulty ------------------------------------------------------------
   // Each difficulty keeps its own top score (Medium keeps the original one).
-  function bestKey() {
-    return Difficulty.mode === 'medium' ? CONFIG.BEST_SCORE_KEY : CONFIG.BEST_SCORE_KEY + '_' + Difficulty.mode;
+  // A run modifier keeps its own record too (the key gets a suffix; no modifier = the plain key).
+  function bestKeyOf(mode, mutId) {
+    return (mode === 'medium' ? CONFIG.BEST_SCORE_KEY : CONFIG.BEST_SCORE_KEY + '_' + mode) + (mutId ? '_m_' + mutId : '');
   }
-  function readBest(mode) {
-    var v = 0;
-    var key = !mode ? bestKey() : (mode === 'medium' ? CONFIG.BEST_SCORE_KEY : CONFIG.BEST_SCORE_KEY + '_' + mode);
-    v = parseInt(lsGet(key) || '0', 10) || 0;
-    return v;
+  function bestKey() { return bestKeyOf(Difficulty.mode, Mutators.id); }
+  function readBest(mode, mutId) {
+    var key = !mode ? bestKey() : bestKeyOf(mode, mutId === undefined ? Mutators.id : mutId);
+    return parseInt(lsGet(key) || '0', 10) || 0;
   }
   // Top score of every difficulty, shown on the difficulty buttons and the HUD chip.
   function refreshBests() {
     var D = Difficulty.cur;
     el.bestScore.textContent = bestScore;
-    el.bestMode.textContent = D.icon + ' ' + D.label.toUpperCase();
-    el.goMode.textContent = D.icon + ' ' + D.label.toUpperCase();
+    var M = Mutators.cur, tag = D.icon + ' ' + D.label.toUpperCase() + (M ? ' ' + M.icon : '');
+    el.bestMode.textContent = tag;
+    el.goMode.textContent = tag;
     el.goBest.textContent = bestScore;
     el.diffButtons.forEach(function (b) {
       var m = b.getAttribute('data-diff');
@@ -742,6 +778,37 @@
     refreshBests();
     // the road ahead is built for the new difficulty (mid-run it applies to rows built from now on)
     if (!silent && state === 'start') rebuildWorld();
+  }
+
+  // ---- run modifiers ----------------------------------------------------------
+  // Picked on the home screen. The world ahead is rebuilt with the new rules.
+  function applyMutator(id, silent) {
+    Mutators.set(id);
+    var M = Mutators.cur;
+    Weather.setForced(M && M.tod, M && M.wx);
+    el.mutBtn.innerHTML = '<span class="mi">' + (M ? M.icon : '\uD83C\uDFB2') + '</span> ' + (M ? M.name.toUpperCase() : 'MODIFIERS');
+    el.mutBtn.classList.toggle('on', !!M);
+    bestScore = readBest();
+    refreshBests();
+    if (!silent && state === 'start') rebuildWorld();
+  }
+
+  function renderMutators() {
+    var cur = Mutators.id, html = '';
+    function card(id, icon, name, desc, top) {
+      return '<button class="mut-card' + (cur === id ? ' active' : '') + '" data-mut="' + (id || '') + '">' +
+        '<span class="mc-ico">' + icon + '</span><span class="mc-txt"><b>' + name + '</b><small>' + desc + '</small></span>' +
+        '<span class="mc-top">' + (top === null ? '' : 'TOP ' + top) + '</span></button>';
+    }
+    html += card(null, '\uD83D\uDEAB', 'No modifier', 'The normal game.', readBest(Difficulty.mode, null));
+    Mutators.LIST.forEach(function (m) { html += card(m.id, m.icon, m.name, m.desc, readBest(Difficulty.mode, m.id)); });
+    el.mutBody.innerHTML = html;
+  }
+
+  // a toast at the start of a run with a modifier on
+  function announceMutator() {
+    var M = Mutators.cur;
+    if (M) showToast(M.icon + ' ' + M.name.toUpperCase() + '!', '#ff8a1f');
   }
 
   function rebuildWorld() {
@@ -843,15 +910,29 @@
     el.shopCoins.textContent = totalCoins;
   }
 
+  // Tabs whose items are shown as an emoji card instead of a pixel chicken.
+  function isIconTab(kind) { return kind !== 'skin' && kind !== 'outfit'; }
+  var WORN_LABEL = { skin: 'EQUIPPED', pet: 'FOLLOWING', trail: 'ON', aura: 'ON', death: 'EQUIPPED', hsound: 'EQUIPPED' };
+
+  // Tell the trophies what the wardrobe looks like now.
+  function syncShopTrophies() {
+    Achievements.event('owned', Cosmetics.wardrobeCount(), true);
+    Achievements.event('shopItems', Cosmetics.boughtCount(), true);
+    if (Cosmetics.list('pet').some(function (it) { return Cosmetics.owned('pet', it.id); })) Achievements.event('pets', 1, true);
+  }
+
   function renderShop() {
     el.shopCoins.textContent = totalCoins;
     var look = Cosmetics.current();
     el.shopPreview.innerHTML = Cosmetics.svg(look);
     var worn = [look.head && look.head.name, look.face && look.face.name].filter(Boolean).join(' + ');
+    var friends = ['pet', 'trail', 'aura'].map(function (k) { return Cosmetics.eq(k); }).filter(Boolean)
+      .map(function (it) { return it.icon + ' ' + it.name; }).join(' · ');
     el.shopLook.innerHTML = '<b>' + look.skin.name + '</b><small>' + (worn || 'No outfit') + '</small>' +
+      (friends ? '<small>' + friends + '</small>' : '') +
       '<small>' + Cosmetics.ownedCount() + ' / ' + Cosmetics.totalCount() + ' collected</small>';
     el.chestBtn.classList.toggle('poor', totalCoins < Cosmetics.CHEST_PRICE);
-    var items = shopTab === 'skin' ? Cosmetics.SKINS : shopTab === 'fx' ? Cosmetics.FX : Cosmetics.OUTFITS;
+    var items = Cosmetics.list(shopTab);
     var html = '';
     items.forEach(function (it) {
       var owned = Cosmetics.owned(shopTab, it.id);
@@ -859,9 +940,9 @@
       var preview = shopTab === 'skin'
         ? { skin: it, head: look.head, face: look.face }
         : { skin: look.skin, head: it.slot === 'head' ? it : null, face: it.slot === 'face' ? it : null };
-      var prevHtml = shopTab === 'fx' ? '<div class="si-prev fxprev">' + it.icon + '</div>' : '<div class="si-prev">' + Cosmetics.svg(preview) + '</div>';
+      var prevHtml = isIconTab(shopTab) ? '<div class="si-prev fxprev">' + it.icon + '</div>' : '<div class="si-prev">' + Cosmetics.svg(preview) + '</div>';
       var label, cls = 'shop-item';
-      if (owned) { cls += ' owned' + (worn2 ? ' equipped' : ''); label = worn2 ? (shopTab === 'skin' ? 'EQUIPPED' : 'WORN') : 'OWNED'; }
+      if (owned) { cls += ' owned' + (worn2 ? ' equipped' : ''); label = worn2 ? (WORN_LABEL[shopTab] || 'WORN') : 'OWNED'; }
       else { label = '🪙 ' + it.price; if (totalCoins < it.price) cls += ' poor'; }
       html += '<button class="' + cls + '" data-kind="' + shopTab + '" data-id="' + it.id + '">' +
         prevHtml +
@@ -884,11 +965,11 @@
     setCoins(totalCoins - Cosmetics.CHEST_PRICE);
     Cosmetics.buy(pick.kind, pick.id);
     Cosmetics.equip(pick.kind, pick.id);
-    Achievements.event('owned', Cosmetics.wardrobeCount(), true);
+    syncShopTrophies();
     Achievements.event('chests', 1);
     var it = Cosmetics.itemOf(pick.kind, pick.id);
     var look = Cosmetics.current();
-    var prev = pick.kind === 'fx' ? '<div class="cr-prev fxprev">' + it.icon + '</div>'
+    var prev = isIconTab(pick.kind) ? '<div class="cr-prev fxprev">' + it.icon + '</div>'
       : '<div class="cr-prev">' + Cosmetics.svg(pick.kind === 'skin' ? { skin: it, head: null, face: null } : { skin: look.skin, head: it.slot === 'head' ? it : null, face: it.slot === 'face' ? it : null }) + '</div>';
     var rar = Cosmetics.rarity(it.price);
     el.chestReveal.innerHTML = '<div class="cr-box">\uD83C\uDF81</div><div class="cr-item">' + prev +
@@ -902,9 +983,19 @@
   }
 
   function applyLookChange() {
-    player.applyLook();
+    GameAudio.setHopPack(Cosmetics.eqId('hsound'));
+    player.applyLook();                          // (also puts on the pet and the aura)
     el.heroChick.innerHTML = Cosmetics.svg();
   }
+
+  // what the hint line says after you pick something in a tab
+  var SHOP_TIPS = {
+    pet: function (name, was) { return was ? name + ' went home.' : 'Say hi to ' + name + '!'; },
+    trail: function (name, was) { return was ? 'Trail off.' : name + ' trail on! Hop to see it.'; },
+    aura: function (name, was) { return was ? 'Aura off.' : name + ' aura on!'; },
+    death: function (name) { return name + ' will play whenever you lose (not on an eagle or UFO grab).'; },
+    hsound: function (name) { return name + ' hops!'; }
+  };
 
   function onShopItem(kind, id, btn) {
     var name = Cosmetics.itemOf(kind, id).name;
@@ -912,15 +1003,16 @@
       var was = Cosmetics.isEquipped(kind, id);
       Cosmetics.equip(kind, id);
       GameAudio.equip();
-      el.shopHint.textContent = kind !== 'skin' && was ? name + ' taken off.' : (kind === 'fx' ? name + ' on!' : 'Wearing ' + name + '!');
+      el.shopHint.textContent = SHOP_TIPS[kind] ? SHOP_TIPS[kind](name, was) : kind !== 'skin' && was ? name + ' taken off.' : (kind === 'fx' ? name + ' on!' : 'Wearing ' + name + '!');
       applyLookChange();
+      if (kind === 'hsound') GameAudio.hop();      // a taste of the new hop sound
     } else {
       var price = Cosmetics.price(kind, id);
       if (totalCoins >= price) {
         setCoins(totalCoins - price);
         Cosmetics.buy(kind, id);
         Cosmetics.equip(kind, id);
-        Achievements.event('owned', Cosmetics.wardrobeCount(), true);
+        syncShopTrophies();
         GameAudio.buy();
         vibrate(20);
         el.shopHint.textContent = 'Bought ' + name + '! Looking good.';
@@ -957,6 +1049,21 @@
     updateMissionDot();
   }
 
+  // The weekly challenge card (same look as the daily one, in purple).
+  function weeklyCardHtml(wk) {
+    var fresh = wk.done && !wk.seen;
+    var pct = Math.round(100 * wk.progress / wk.target);
+    return '<div class="sec-title">WEEKLY CHALLENGE</div>' +
+      '<div class="daily-card weekly-card' + (wk.done && !fresh ? ' done' : '') + (fresh ? ' pending' : '') + '">' +
+      '<div class="dc-top"><span>' + wk.icon + ' THIS WEEK</span><span class="streak">\uD83D\uDCC5 ' + wk.streak + ' week' + (wk.streak === 1 ? '' : 's') + '</span></div>' +
+      '<div class="dc-text">' + wk.text + '</div>' +
+      '<div class="dc-bottom"><div class="mbar"><i style="width:' + (fresh ? 0 : pct) + '%"></i></div>' +
+      '<span class="dc-count">' + (wk.done ? '\u2713 DONE' : wk.progress + ' / ' + wk.target) + '</span>' +
+      '<span class="mrew">+' + wk.reward + ' \uD83E\uDE99</span></div>' +
+      '<div class="mission-foot">' + (wk.done ? 'A new challenge starts on Monday!' : 'Ends in ' + wk.daysLeft + ' day' + (wk.daysLeft === 1 ? '' : 's') + (wk.noZen ? ' \u00B7 Zen runs do not count' : '')) + '</div>' +
+      '</div>';
+  }
+
   // enterIdx: slots that just received a brand-new mission (they slide in)
   function renderMissions(enterIdx) {
     var v = Missions.view();
@@ -971,7 +1078,7 @@
       '<span class="dc-count">' + (d.done ? '✓ DONE' : d.progress + ' / ' + d.target) + '</span>' +
       '<span class="mrew">+' + d.reward + ' 🪙</span></div>' +
       (d.done ? '<div class="mission-foot">Come back tomorrow to keep your streak going!</div>' : '') +
-      '</div><div class="sec-title">MISSIONS</div>';
+      '</div>' + weeklyCardHtml(v.weekly) + '<div class="sec-title">MISSIONS</div>';
     var anyDone = false;
     v.missions.forEach(function (m, i) {
       if (m.done) anyDone = true;
@@ -983,7 +1090,8 @@
     html += '<div class="mission-foot">Missions completed: ' + v.completed + '</div>';
     el.missionsBody.innerHTML = html;
 
-    if (!anyDone && !dailyFresh) return;
+    var weeklyFresh = v.weekly.done && !v.weekly.seen;
+    if (!anyDone && !dailyFresh && !weeklyFresh) return;
     // 1) the bar fills up  2) it turns green  3) the finished mission slides away  4) a new one arrives
     var fills = el.missionsBody.querySelectorAll('.mrow.completing .mbar i, .daily-card.pending .mbar i');
     requestAnimationFrame(function () {
@@ -1043,6 +1151,20 @@
     el.trophyDot.classList.toggle('hidden', !Achievements.hasNew());
   }
 
+  // The Trophies screen has two tabs: the trophies and the lifetime stats.
+  function showTrophyPane(pane) {
+    el.ttTabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-pane') === pane); });
+    el.trophyPane.classList.toggle('hidden', pane !== 'trophies');
+    el.statsPane.classList.toggle('hidden', pane !== 'stats');
+    el.ttTitle.textContent = pane === 'stats' ? 'STATS' : 'TROPHIES';
+    if (pane === 'stats') renderStats(); else renderTrophies();
+    el.statsBody.scrollTop = 0;
+  }
+
+  function renderStats() {
+    el.statsBody.innerHTML = Stats.html(function (diff, mutId) { return readBest(diff, mutId); });
+  }
+
   function renderTrophies() {
     var list = Achievements.view(), c = Achievements.counts();
     el.trophyCount.textContent = c.done + ' / ' + c.total;
@@ -1071,6 +1193,10 @@
       Achievements.event('daily', 1);
       Achievements.event('streak', info.streak, true);
       showToast('🏅 DAILY DONE! +' + info.reward + ' 🪙  🔥' + info.streak, '#ff8a1f');
+    } else if (info.kind === 'weekly') {
+      Achievements.event('weekly', 1);
+      Achievements.event('wstreak', info.streak, true);
+      showToast('\uD83D\uDCC5 WEEKLY DONE! +' + info.reward + ' \uD83E\uDE99  \uD83D\uDCC5' + info.streak, '#8f6bff');
     } else {
       showToast(info.icon + ' MISSION! +' + info.reward + ' 🪙', '#3d8bff');
     }
@@ -1089,6 +1215,13 @@
     el.coins.textContent = totalCoins;
     el.shopCoins.textContent = totalCoins;
     updateMissionDot();
+  }
+
+  // Points go through here: a modifier may multiply them (Penniless counts 3x).
+  function addScore(pts) {
+    scoreRaw += pts * Mutators.num('scoreMult', 1);
+    score = Math.floor(scoreRaw + 1e-6);
+    showScore();
   }
 
   function showScore() {
@@ -1123,6 +1256,7 @@
   function addCoins(base) {
     var value = base * (powers.double ? 2 : 1);
     runStats.coins += value;
+    Stats.add('coins', value);
     setCoins(totalCoins + value);
     Missions.event('coins', value);
     Achievements.event('coins', value);
@@ -1147,25 +1281,69 @@
     lastComboCount = -1;
   }
 
-  // ---- rare events: thunderstorm / solar flare, and coin rain -----------------------
+  // ---- rare events: thunderstorm / solar flare, coin rain, supply drop, traffic jam, fireworks ----
   var evt = { cooldown: 40, strikesLeft: 0, strikeT: 0 };
+
+  // A rare event happened (kind: storm | rain | drone | jam | fireworks | stampede).
+  function noteEvent(kind) {
+    Achievements.event('events', 1);
+    Missions.event('events', 1);
+    Stats.bump('events', kind);
+  }
 
   function maybeEvent(z) {
     if (z < 25 || evt.strikesLeft > 0) return;
     if (--evt.cooldown > 0 || Math.random() > 0.07) return;
     evt.cooldown = 45 + Utils.randInt(0, 25);
-    if (Math.random() < 0.5) {
-      Achievements.event('events', 1);
+    var noCoins = Mutators.has('noCoins');       // (Penniless: nothing that hands out coins)
+    var kind = Utils.weightedChoice([
+      { value: 'storm', weight: 0.28 }, { value: 'rain', weight: noCoins ? 0 : 0.2 }, { value: 'drone', weight: noCoins ? 0 : 0.18 },
+      { value: 'jam', weight: 0.17 }, { value: 'fireworks', weight: 0.17 }
+    ]);
+    if (kind === 'storm') {
+      noteEvent('storm');
       var st = Biome.theme(curBiome).storm;
       showToast(st ? st.toast : '\u26A1 THUNDERSTORM!', '#7f9dff');
       evt.strikesLeft = 3; evt.strikeT = 0.9;
-    } else {
+    } else if (kind === 'rain') {
       var n = world.coinRain(Math.round(player.z));
       if (n) {
-        Achievements.event('events', 1);
+        noteEvent('rain');
         showToast('\uD83E\uDE99 COIN RAIN!', '#ffc107');
         GameAudio.coinRain();
       }
+    } else if (kind === 'drone') {
+      if (Events.startSupplyDrop(world, player)) {
+        noteEvent('drone');
+        showToast('\uD83D\uDE81 SUPPLY DROP!', '#3d8bff');
+      } else evt.cooldown = 6;
+    } else if (kind === 'jam') {
+      if (world.startJam(Math.round(player.z))) {
+        noteEvent('jam');
+        showToast('\uD83D\uDEA8 TRAFFIC JAM!', '#ff5a5f');
+      } else evt.cooldown = 6;
+    } else {
+      noteEvent('fireworks');
+      Achievements.event('fireworks', 1);
+      Events.startFireworks(6.5);
+      activatePower('fireworks');
+    }
+  }
+
+  // A supply crate picked up: coins (and sometimes a power-up).
+  function onCrate(crate, row) {
+    var n = Utils.randInt(8, 16);
+    GameAudio.crateOpen();
+    vibrate(25);
+    Particles.burst(crate.x, row.top + 0.5, row.z, { colors: [0xffd23f, 0xfff0a0, 0xffffff, 0xc08a50], count: 18, speed: 3.2, up: 5, size: 0.12, life: 0.8, gravity: 9, spread: 0.3, floor: row.top });
+    Particles.ring(crate.x, row.top + 0.05, row.z, 0xffd23f, 3);
+    addCoins(n);
+    Stats.add('crates');
+    popText('\uD83D\uDCE6 +' + n * (powers.double ? 2 : 1) + ' \uD83E\uDE99', '#ffc107');
+    Achievements.event('crates', 1);
+    if (Math.random() < 0.3) {
+      var type = Utils.weightedChoice(Object.keys(CONFIG.POWERUPS).map(function (k) { return { value: k, weight: CONFIG.POWERUPS[k].weight }; }));
+      activatePower(type, crate.x, row.top, row.z);
     }
   }
 
@@ -1185,7 +1363,27 @@
     if (kind === 'stampede') {
       showToast('\uD83E\uDD94 STAMPEDE AHEAD!', '#ff8a1f');
       GameAudio.stampede();
-      Achievements.event('events', 1);
+      noteEvent('stampede');
+    }
+  }
+
+  // The Stats page counts every kind of lane you cross and the world it was in.
+  function countLanes(row) {
+    var T = CONFIG.ROW_TYPES;
+    Stats.bump('worlds', row.biome);
+    if (row.bikes) Stats.bump('lanes', 'bikes');
+    if (row.stampede) Stats.bump('lanes', 'stampedes');
+    if (row.crumbly) Stats.bump('lanes', 'crumbles');
+    if (row.dual) Stats.bump('lanes', 'dualRails');
+    if (row.belt) Stats.bump('lanes', 'belts');
+    if (row.mud) Stats.bump('lanes', 'muds');
+    if (row.ice) Stats.bump('lanes', 'ice');
+    if (row.type === T.ROAD) Stats.bump('lanes', 'roads');
+    else if (row.type === T.RAIL) Stats.bump('lanes', 'rails');
+    else if (row.type === T.WATER) {
+      Stats.bump('lanes', 'rivers');
+      if (row.void) Stats.bump('lanes', 'voids');
+      else if (row.logs.some(function (l) { return l.croc; })) Stats.bump('lanes', 'crocs');
     }
   }
 
@@ -1213,21 +1411,32 @@
     combo.mult = mult;
     runStats.maxMult = Math.max(runStats.maxMult, mult);
     runStats.maxCombo = Math.max(runStats.maxCombo, combo.count);
+    Stats.add('rows');
+    Stats.max('bestRow', z);
+    Stats.max('maxCombo', combo.count);
+    Stats.max('maxMult', mult);
 
-    score += mult;
-    showScore();
+    addScore(mult + (powers.fireworks ? 2 : 0));     // (a firework show adds +2 to every row)
 
     var row = world.getRow(z);
     if (row && row.type === CONFIG.ROW_TYPES.ROAD) Missions.event('roads', 1);
     else if (row && row.type === CONFIG.ROW_TYPES.WATER) Missions.event('rivers', 1);
     Missions.event('rows', z, true);
     Achievements.event('rows', z, true);
+    if (Mutators.cur) {
+      Achievements.event('mutRows', z, true);
+      if (z === 10) Achievements.mark('mutKinds', Mutators.id);
+    }
     Achievements.event('rows_' + Difficulty.mode, z, true);
     if (row) {
+      countLanes(row);
       if (row.bikes) Achievements.event('bikes', 1);
       if (row.stampede) Achievements.event('stampedes', 1);
       if (row.crumbly) Achievements.event('crumbles', 1);
       if (row.dual) Achievements.event('dualRails', 1);
+      if (row.belt) { Achievements.event('belts', 1); Missions.event('belts', 1); }
+      if (row.mud) Achievements.event('muds', 1);
+      if (row.jam > 0) Achievements.event('jamCross', 1);
       if (row.type === CONFIG.ROW_TYPES.ROAD) Achievements.event('roads', 1);
       else if (row.type === CONFIG.ROW_TYPES.WATER) {
         Achievements.event('rivers', 1);
@@ -1247,9 +1456,9 @@
   function onNearMiss() {
     if (state !== 'playing' || player.dying) return;
     var pts = 5;
-    score += pts;
-    showScore();
+    addScore(pts);
     runStats.near++;
+    Stats.add('near');
     if (combo.count > 0) combo.timer = Math.max(combo.timer, COMBO_WINDOW * 1.5); // a close call keeps the streak alive
     GameAudio.nearMiss();
     vibrate(15);
@@ -1260,6 +1469,7 @@
   }
 
   function updateComboHud(dt) {
+    if (state === 'playing' && powers.fireworks && combo.count > 0 && !player.dying) combo.timer = COMBO_WINDOW;   // the show keeps the combo alive
     if (state === 'playing' && combo.timer > 0 && !player.dying) {
       combo.timer -= dt;
       if (combo.timer <= 0) resetCombo();
@@ -1280,6 +1490,8 @@
   function hexNum(css) { return parseInt(css.slice(1), 16); }
 
   function onItemCollected(type, x, y, z) {
+    Stats.bump('powers', type);
+    Stats.add('powerups');
     Missions.event('powerups', 1);
     Achievements.event('powerups', 1);
     Achievements.mark('powerKinds', type);
@@ -1287,7 +1499,7 @@
   }
 
   function activatePower(type, x, y, z) {
-    var def = CONFIG.POWERUPS[type];
+    var def = CONFIG.POWERUPS[type] || CONFIG.BOOSTS[type];     // (a boost, like the firework combo boost, never appears as a pick-up)
     if (x === undefined) { x = player.x; y = player.y; z = player.z; }
     GameAudio.powerup();
     vibrate(25);
@@ -1379,6 +1591,8 @@
   // ---- game flow ----------------------------------------------------------
   function onPlayerDeath(type) {
     Achievements.mark('deathKinds', type);
+    Stats.bump('deaths', type);
+    lastDeath = type;
     if (type === 'car' || type === 'train') { shakeT = 0.32; vibrate(70); }
     else if (type === 'drown' || type === 'fall') { shakeT = 0.12; vibrate(40); }
     else if (type === 'croc') { shakeT = 0.25; vibrate(60); }
@@ -1418,6 +1632,8 @@
     document.body.classList.remove('in-run');
     clearPowers();
     Missions.runEnd();
+    if (Mutators.cur && score > 0) { Achievements.event('mutRuns', 1); Missions.event('modRuns', 1); }
+    Stats.runDone({ score: score, rows: player.maxZ, diff: Difficulty.mode, mut: Mutators.id, death: lastDeath, time: runTime });
     Achievements.runEnd();
     var isBest = score > bestScore;
     if (isBest) {
@@ -1463,7 +1679,7 @@
   };
 
   function shareText() {
-    return 'I scored ' + score + ' on ' + Difficulty.cur.label + ' in Crossy Way! Can you beat me?';
+    return 'I scored ' + score + ' on ' + Difficulty.cur.label + (Mutators.cur ? ' (' + Mutators.cur.name + ')' : '') + ' in Crossy Way! Can you beat me?';
   }
 
   function snapshotScene() {
@@ -1597,7 +1813,7 @@
 
       // chips: mode, top score, coins
       var chips = [
-        Difficulty.cur.icon + ' ' + Difficulty.cur.label.toUpperCase(),
+        Difficulty.cur.icon + ' ' + Difficulty.cur.label.toUpperCase() + (Mutators.cur ? ' ' + Mutators.cur.icon : ''),
         '🏆 TOP ' + bestScore,
         '🪙 ' + runStats.coins
       ];
@@ -1698,6 +1914,9 @@
     state = 'start';
     document.body.classList.remove('in-run');
     score = 0;
+    scoreRaw = 0;
+    runTime = 0;
+    lastDeath = null;
     runStats = { coins: 0, near: 0, maxMult: 1, maxCombo: 0 };
     resetCombo();
     evt.cooldown = 40; evt.strikesLeft = 0; evt.strikeT = 0;
@@ -1712,6 +1931,8 @@
     el.confetti.innerHTML = '';
     el.pops.innerHTML = '';
     Particles.clear();
+    Events.clear();
+    Flair.clear();
     world.destroy();
     world = new World(scene);
     hookWorld();
@@ -1721,7 +1942,8 @@
       state = 'playing';
       document.body.classList.add('in-run');
       el.startPanel.classList.add('hidden');
-      Missions.runStart();
+      announceMutator();
+      Missions.runStart({ mut: Mutators.id, diff: Difficulty.mode });
       Achievements.runStart();
       runTrophies = [];
       camX = 0;
@@ -1777,11 +1999,13 @@
     wxTimer -= dt;
     if (wxTimer <= 0) { wxTimer = 0.6; el.wxBadge.textContent = Weather.label(); }
 
-    if (state === 'playing' && !player.dying) idleTimer += dt;
+    if (state === 'playing' && !player.dying) { idleTimer += dt; runTime += dt; }
     player.update(dt, world);
     updatePowers(dt);
     updateEvents(dt);
     Particles.update(dt);
+    Events.update(dt, player);
+    Flair.update(dt);
     updateCamera(dt);
 
     if (player.maxZ !== lastRow) {

@@ -14,6 +14,9 @@ A fast, colourful hopping game. Guide a little chicken across endless roads, riv
 - **Double railways.** Two tracks next to each other can warn and fire together, with trains coming from opposite directions.
 - **Rotten logs.** Dark, cracked logs shake when you stand on them, then break up and sink for a few seconds.
 - **Slippery ice.** Hop onto an ice lane and you keep gliding a little (up to 3 tiles sideways, one lane forward or back). Plan your next hop.
+- **Conveyor lanes.** A belt with amber chevrons carries you sideways (1.5 tiles a second) for as long as you stand on it. Neighbouring belts run in opposite directions. The belt stops you at the edge of the field instead of dropping you.
+- **Mud lanes** (moon dust in Space). A hop that *starts* in the mud is slow and low (0.34 s instead of 0.15 s), and you sink into it a little.
+- **Trampoline lanes** (jump pads in Space). Land on a springy pink lane and you are flung **two rows forward**, over anything in between. It will not throw you into open water: if the far tile is a river with no log under it, you get a shorter bounce (or none). Two trampoline rows in a row chain-bounce.
 - **Chasms.** Some lanes are a bottomless drop with nothing but moving platforms to cross them. Time your hop — miss and you fall.
 - **Don't dawdle.** Stand still and you'll hear the **eagle screech**; 3 seconds later it swoops in. Reach a new row to send it away.
 
@@ -22,6 +25,22 @@ You lose if you get hit, fall in the water or a chasm, get eaten by a crocodile 
 ## Difficulty
 
 Pick **Zen, Easy, Medium, Hard or Extreme** in Settings (or on the home screen's difficulty button). **Zen** is the relaxed mode: **no eagle and no timer**, slow calm traffic and lots of extra coins — great for new players or for just collecting coins. Harder modes mean faster and busier traffic, more frequent trains, faster rivers and a quicker eagle (Easy 12 s, Medium 9 s, Hard 7.5 s, Extreme 6 s). **Each difficulty keeps its own top score** — you'll see them listed on the difficulty buttons, and the 🏆 chip on screen and the game-over card show the top score for the mode you're playing.
+
+## Modifiers 🎲
+
+Pick **one** rule twist for your next run with the **Modifiers** button on the home screen (the picker is only available there, like the difficulty). Every modifier keeps **its own top score** for each difficulty, and the 🏆 chip and the game-over card show a small icon for the one you are playing.
+
+| | Modifier | What changes |
+| --- | --- | --- |
+| 🌙 | Night Shift | It is always night (headlights on) |
+| 🌫️ | Pea Soup | Thick fog hides everything ahead |
+| 🚗 | Rush Hour | Twice the traffic on every road |
+| ⚡ | Speed Run | Traffic, logs and trains are 40% faster and trains come more often |
+| 🦅 | Eagle Rush | The eagle shows up after only 4.5 seconds — even in Zen |
+| 🚫 | Penniless | No coins at all, but every point counts **3x** |
+| 🌕 | Moon Hops | Low gravity: slow, floaty hops. You are in the air longer (and safe from traffic while high up), but you land later |
+| 🪞 | Mirror World | Left and right are swapped |
+| 🧊 | Slip & Slide | Almost every grass lane is slippery ice |
 
 ## Scoring
 
@@ -62,19 +81,40 @@ Cars, taxis, police cars, vans, trucks and buses — plus **motorbikes, tractors
 
 Every so often something special happens: a **thunderstorm** (or a **solar flare** in Space) lights up the whole field in a few flashes, a **coin rain** showers coins on the rows ahead, or a **stampede** — a lane of bison (or alien beasts) thunders across the road in a cloud of dust. You'll hear a rumble and see a toast just before a stampede.
 
+Three more can happen on any run:
+
+- 🚁 **Supply drop** — a drone buzzes across the field and drops a **crate on a parachute** onto a grass lane a few rows ahead. Hop onto it for 8–16 coins (and sometimes a free power-up).
+- 🚨 **Traffic jam** — the nearest busy road (and the road lanes beside it) grinds to a halt for about 6 seconds while every driver leans on the horn. Your chance to cross! (Cars that are stopped still hurt if you walk into them.)
+- 🎆 **Fireworks** — a firework show lights up the sky and gives an 8-second **combo boost**: the combo timer cannot run out and every new row is worth **+2** points.
+
 ## Trophies 🏆
 
-34 long-term **achievements** sit next to the missions — reach far in a run, hop thousands of times, cross crocodile rivers and chasms, grab every power-up, reach Space and come back, survive Hard and Extreme, lose in every possible way… Each one pays out coins, you get a toast the moment it unlocks, and the game-over card lists the trophies you just earned. Open **Trophies** on the home screen to see your progress (a red dot shows when there's something new).
+54 long-term **achievements** sit next to the missions — reach far in a run, hop thousands of times, cross crocodile rivers and chasms, grab every power-up, reach Space and come back, survive Hard and Extreme, lose in every possible way, ride conveyors and trampolines, grab supply crates, try every modifier, finish weekly challenges… Each one pays out coins, you get a toast the moment it unlocks, and the game-over card lists the trophies you just earned. Open **Trophies** on the home screen to see your progress (a red dot shows when there's something new).
+
+## Stats 📊
+
+Open **Trophies** on the home screen and switch to the **Stats** tab. It keeps lifetime numbers the trophies don't: runs, time played, **total rows travelled** and your furthest row, hops, coins collected, your **longest combo** and best multiplier, close calls, power-ups grabbed (and your favourite), **how you lose** (with your favourite way to go), rows reached in each world, every kind of lane you have crossed, the rare events you have seen, **how often you used each modifier** (with its top score), runs per difficulty (with its top score) and your **last 10 runs**. If you already had progress, hops, coins, runs and lane counts are carried over from your trophies; deaths, time and distance count from the day you got this update.
 
 ## Shop 🛍️
 
 
 
-Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, Lime, Fire, Midnight, Golden) and dress it up with **outfits** — shades, a mustache, a bow tie, party hat, red cap, cowboy hat, wizard hat or a royal crown. Plus new hats (chef, top hat, pirate, viking, propeller cap, halo, flower crown), face items (monocle, scarf) and **Hop Effects** — sparkles, hearts, a rainbow, petals, snowfall, embers and bubbles that follow every hop. Mix and match: one hat, one face item and one effect at a time. Feeling lucky? The **Mystery Chest** costs 90 🪙 and gives you a random item you don't own yet (cheaper items are more likely, rare ones are a treat).
+Spend your coins on new looks. Pick a **chicken** (Classic, Brownie, Rosy, Sky, Lime, Fire, Midnight, Golden) and dress it up with **outfits** — shades, a mustache, a bow tie, party hat, red cap, cowboy hat, wizard hat or a royal crown. Plus new hats (chef, top hat, pirate, viking, propeller cap, halo, flower crown), face items (monocle, scarf) and **Hop Effects** — sparkles, hearts, a rainbow, petals, snowfall, embers and bubbles that follow every hop. Mix and match: one hat, one face item and one effect at a time.
+
+There is more in the shop than looks for the chicken (everything here is **cosmetic only** — nothing changes how the game plays):
+
+- 🐥 **Pets** — a Duckling, Frog, Bunny, Mini Drone or Baby Dragon follows a step behind you, hopping when you hop. It only ever stands where you just stood, so it never gets in the way (and nothing can hurt it).
+- 🐾 **Trails** — Paw Prints, a Flower Path, Star Dust, Neon Tiles or a Rainbow Road appear on every tile you land on and fade away (never on water).
+- 🧲 **Auras** — Gold Orbit (little spinning coins), Frost Spin, Fire Ring, Star Halo, or a **Magnet Field** (two magnets circling you and sending out magnetic waves). They look like the Magnet power-up but do nothing.
+- 💨 **Exits** — how the chicken leaves the game: **Poof!**, **Confetti** (pops like a party popper), **Cartoon Spin**, **Ghost** or **Blast Off**. They play for every way to lose except the eagle / UFO grab.
+- 🔊 **Sounds** — hop sound packs: Boing, Pop, Squeak, Chirp or Arcade (all synthesized in the game). Equipping one plays a hop so you can hear it.
+
+Feeling lucky? The **Mystery Chest** costs 90 🪙 and gives you a random item you don't own yet from any tab (cheaper items are more likely, rare ones are a treat).
 
 ## Missions 🎯
 
 - **Daily Challenge** — a new goal every day, the same for everyone. Finish it to earn bonus coins and build a 🔥 streak for bigger rewards.
+- **Weekly Challenge** — one harder goal per week (Monday to Sunday), the same for everyone, shown under the daily challenge. Some are tied to a modifier ("Reach row 60 with 🚗 Rush Hour on" — only runs with that modifier count), others add up over the whole week ("Collect 600 coins this week", "Cross 25 conveyor lanes this week", "Finish 10 runs with a modifier on"). Runs on **Zen** don't count for the modifier goals. It pays **150 🪙**, plus **+25 for every week in a row** (up to 250), and has its own 📅 week streak.
 - **Missions** — three rolling goals like "collect 30 coins" or "reach row 50". Finish one and a red dot appears on the Missions button. Open it to watch the bar fill, turn green and slide away, and a fresh mission takes its place.
 
 ## Biomes 🚀

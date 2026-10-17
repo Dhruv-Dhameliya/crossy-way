@@ -10,7 +10,11 @@
     waterA: 0x06081a, waterB: 0x050716, waterSide: 0x02030c,
     railBedA: 0x2c2523, railBedB: 0x272120, railSide: 0x14100f, sleeper: 0xa8662a,
     iceA: 0xa8d8e8, iceB: 0x93c8dc, iceSide: 0x4a88a8,
-    voidA: 0x030308, voidB: 0x020206, voidSide: 0x000000, voidAccent: 0xc8742a
+    voidA: 0x030308, voidB: 0x020206, voidSide: 0x000000, voidAccent: 0xc8742a,
+    // lane twists: grey moon dust, a magnetic conveyor and glowing jump pads
+    mudA: 0x5c5f6b, mudB: 0x54576a, mudSide: 0x2a2c38, mudPuddle: 0x7a86b4,
+    beltA: 0x30364a, beltB: 0x2b3144, beltSide: 0x181c28, beltArrow: 0x6fd6ff,
+    bounceA: 0x4a3f8f, bounceB: 0x42387f, bounceSide: 0x1e1944, bounceRing: 0x9ff3ff
   };
 
   // an astronaut helmet: a see-through bubble with a light collar (geometry and material are shared)

@@ -1,5 +1,6 @@
-// Chicken skins and outfits for the coin shop: what exists, what you own, what
-// you're wearing, plus the 3D parts and the little pixel previews.
+// Everything the coin shop sells: chicken skins, outfits, hop effects and the "extras" (pets,
+// trails, auras, death animations, hop sounds): what exists, what you own, what you're wearing,
+// plus the 3D parts and the little pixel previews.
 var Cosmetics = (function () {
   var KEY = 'crossy_way_cosmetics';
 
@@ -98,6 +99,53 @@ var Cosmetics = (function () {
     { id: 'bubbles', name: 'Bubbles',  icon: '🫧', price: 90,  colors: [0xcff1ff, 0x9be0ff, 0xffffff], up: 1.2, gravity: -1.5, size: 0.12, life: 1 }
   ];
 
+  // ---------------------------------------------------------------- extras
+  // Pets follow you around (cosmetic only: they never do anything), trails mark the ground you
+  // hopped on, auras circle the chicken, death animations replace the way it goes (every way to
+  // lose except the eagle / UFO grab), hop sounds change the sound of a hop.
+  // Their looks live in pets.js, flair.js and audio.js, found by id; this is the catalogue.
+  // radio: one is always picked (the free 'classic' is the default); the others can be switched off.
+  var PETS = [
+    { id: 'duckling', name: 'Duckling', icon: '🐥', price: 120 },
+    { id: 'frog',     name: 'Frog',     icon: '🐸', price: 150 },
+    { id: 'bunny',    name: 'Bunny',    icon: '🐰', price: 180 },
+    { id: 'drone',    name: 'Mini Drone', icon: '🚁', price: 250 },
+    { id: 'dragon',   name: 'Baby Dragon', icon: '🐲', price: 340 }
+  ];
+  var TRAILS = [
+    { id: 'prints',  name: 'Paw Prints',   icon: '🐾', price: 60 },
+    { id: 'flowers', name: 'Flower Path',  icon: '🌼', price: 100 },
+    { id: 'stars',   name: 'Star Dust',    icon: '⭐', price: 120 },
+    { id: 'neon',    name: 'Neon Tiles',   icon: '💠', price: 150 },
+    { id: 'rainbow', name: 'Rainbow Road', icon: '🛣️', price: 210 }
+  ];
+  var AURAS = [
+    { id: 'coins',  name: 'Gold Orbit',   icon: '🪙', price: 180 },
+    { id: 'frost',  name: 'Frost Spin',   icon: '❄️', price: 190 },
+    { id: 'fire',   name: 'Fire Ring',    icon: '🔥', price: 200 },
+    { id: 'magnet', name: 'Magnet Field', icon: '🧲', price: 220 },
+    { id: 'star',   name: 'Star Halo',    icon: '🌟', price: 240 }
+  ];
+  var DEATHS = [
+    { id: 'classic',  name: 'Classic',   icon: '💥', price: 0 },
+    { id: 'poof',     name: 'Poof!',     icon: '💨', price: 80 },
+    { id: 'confetti', name: 'Confetti',  icon: '🎉', price: 110 },
+    { id: 'spin',     name: 'Cartoon Spin', icon: '🌀', price: 130 },
+    { id: 'ghost',    name: 'Ghost',     icon: '👻', price: 150 },
+    { id: 'rocket',   name: 'Blast Off', icon: '🚀', price: 200 }
+  ];
+  var HSOUNDS = [
+    { id: 'classic', name: 'Classic', icon: '🔔', price: 0 },
+    { id: 'boing',   name: 'Boing',   icon: '🦘', price: 50 },
+    { id: 'pop',     name: 'Pop',     icon: '🎈', price: 60 },
+    { id: 'squeak',  name: 'Squeak',  icon: '🦆', price: 70 },
+    { id: 'chirp',   name: 'Chirp',   icon: '🐦', price: 80 },
+    { id: 'blip',    name: 'Arcade',  icon: '👾', price: 90 }
+  ];
+  var EXTRA = { pet: PETS, trail: TRAILS, aura: AURAS, death: DEATHS, hsound: HSOUNDS };
+  var RADIO = { death: 1, hsound: 1 };
+  var EXTRA_KINDS = Object.keys(EXTRA);
+
   // ---------------------------------------------------------------- state
   var state = load();
   var fxCur = fxById(state.fx);   // the worn hop effect (cached: the player asks for it every frame)
@@ -106,10 +154,17 @@ var Cosmetics = (function () {
     var s = null;
     try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* fresh start */ }
     // fill in anything an older or damaged save is missing
-    var d = { skins: ['classic'], outfits: [], fxOwned: [], skin: 'classic', head: null, face: null, fx: null };
+    var d = { skins: ['classic'], outfits: [], fxOwned: [], skin: 'classic', head: null, face: null, fx: null, own: {}, eq: {} };
+    EXTRA_KINDS.forEach(function (k) { d.own[k] = RADIO[k] ? ['classic'] : []; d.eq[k] = RADIO[k] ? 'classic' : null; });
     if (s && typeof s === 'object') {
       ['skins', 'outfits', 'fxOwned'].forEach(function (k) { if (Array.isArray(s[k])) d[k] = s[k]; });
       ['skin', 'head', 'face', 'fx'].forEach(function (k) { if (typeof s[k] === 'string') d[k] = s[k]; });
+      EXTRA_KINDS.forEach(function (k) {
+        if (s.own && Array.isArray(s.own[k])) d.own[k] = s.own[k];
+        if (s.eq && (typeof s.eq[k] === 'string' || s.eq[k] === null)) d.eq[k] = s.eq[k];
+        if (RADIO[k] && d.own[k].indexOf('classic') < 0) d.own[k].unshift('classic');
+        if (RADIO[k] && !d.eq[k]) d.eq[k] = 'classic';
+      });
     }
     if (d.skins.indexOf('classic') < 0) d.skins.unshift('classic');
     return d;
@@ -149,14 +204,36 @@ var Cosmetics = (function () {
     return { skin: skinById(state.skin), head: outfitById(state.head), face: outfitById(state.face) };
   }
 
-  function itemOf(kind, id) { return kind === 'skin' ? skinById(id) : kind === 'fx' ? fxById(id) : outfitById(id); }
-  function ownedList(kind) { return kind === 'skin' ? state.skins : kind === 'fx' ? state.fxOwned : state.outfits; }
+  function extraById(kind, id) { return EXTRA[kind].filter(function (e) { return e.id === id; })[0] || null; }
+  function itemOf(kind, id) {
+    if (EXTRA[kind]) return extraById(kind, id);
+    return kind === 'skin' ? skinById(id) : kind === 'fx' ? fxById(id) : outfitById(id);
+  }
+  function ownedList(kind) {
+    if (EXTRA[kind]) return state.own[kind];
+    return kind === 'skin' ? state.skins : kind === 'fx' ? state.fxOwned : state.outfits;
+  }
+  // the worn extra of this kind (null = none; a radio kind falls back to its free default)
+  function eqItem(kind) {
+    var it = extraById(kind, state.eq[kind]);
+    return it || (RADIO[kind] ? EXTRA[kind][0] : null);
+  }
   function rarity(price) { return price <= 70 ? 'Common' : price <= 140 ? 'Uncommon' : price <= 250 ? 'Rare' : 'Epic'; }
 
   return {
     SKINS: SKINS,
     OUTFITS: OUTFITS,
     FX: FX,
+    EXTRA_KINDS: EXTRA_KINDS,
+    // every item of a shop tab
+    list: function (kind) {
+      return EXTRA[kind] || (kind === 'skin' ? SKINS : kind === 'fx' ? FX : OUTFITS);
+    },
+    // a toggle kind can be taken off again, a radio kind always has one picked
+    isRadio: function (kind) { return !!RADIO[kind]; },
+    // the extra being worn: its catalogue entry (or null), and just its id
+    eq: eqItem,
+    eqId: function (kind) { var it = eqItem(kind); return it ? it.id : null; },
     itemOf: itemOf,
     rarity: rarity,
     // the hop effect being worn (or null)
@@ -164,7 +241,7 @@ var Cosmetics = (function () {
     // Mystery chest: a random item you don't own yet (cheaper items are more likely). null = you own everything.
     chestPick: function () {
       var pool = [];
-      [['skin', SKINS], ['outfit', OUTFITS], ['fx', FX]].forEach(function (g) {
+      [['skin', SKINS], ['outfit', OUTFITS], ['fx', FX]].concat(EXTRA_KINDS.map(function (k) { return [k, EXTRA[k]]; })).forEach(function (g) {
         g[1].forEach(function (it) {
           if (ownedList(g[0]).indexOf(it.id) < 0 && it.price > 0) pool.push({ kind: g[0], id: it.id, w: 1 / Math.sqrt(it.price) });
         });
@@ -185,6 +262,7 @@ var Cosmetics = (function () {
     },
     owned: function (kind, id) { return ownedList(kind).indexOf(id) >= 0; },
     isEquipped: function (kind, id) {
+      if (EXTRA[kind]) return this.eqId(kind) === id;
       if (kind === 'skin') return state.skin === id;
       if (kind === 'fx') return state.fx === id;
       var o = outfitById(id);
@@ -199,7 +277,8 @@ var Cosmetics = (function () {
     // Skins: pick one. Outfits: one per slot; equipping the worn one takes it off.
     equip: function (kind, id) {
       if (!this.owned(kind, id)) return;
-      if (kind === 'skin') state.skin = id;
+      if (EXTRA[kind]) state.eq[kind] = RADIO[kind] ? id : (state.eq[kind] === id ? null : id);
+      else if (kind === 'skin') state.skin = id;
       else if (kind === 'fx') { state.fx = state.fx === id ? null : id; fxCur = fxById(state.fx); }
       else {
         var o = outfitById(id);
@@ -207,9 +286,20 @@ var Cosmetics = (function () {
       }
       save();
     },
-    ownedCount: function () { return state.skins.length + state.outfits.length + state.fxOwned.length; },
+    ownedCount: function () {
+      return state.skins.length + state.outfits.length + state.fxOwned.length +
+        EXTRA_KINDS.reduce(function (n, k) { return n + state.own[k].length; }, 0);
+    },
+    // everything you paid coins for (the free defaults don't count): for the "Shopaholic" trophy
+    boughtCount: function () {
+      return state.skins.length - 1 + state.outfits.length + state.fxOwned.length +
+        EXTRA_KINDS.reduce(function (n, k) { return n + state.own[k].length - (RADIO[k] ? 1 : 0); }, 0);
+    },
     // chickens + outfits you bought (not the free Classic, not hop effects): for the "Fashionista" trophy
     wardrobeCount: function () { return state.skins.length - 1 + state.outfits.length; },
-    totalCount: function () { return SKINS.length + OUTFITS.length + FX.length; }
+    totalCount: function () {
+      return SKINS.length + OUTFITS.length + FX.length +
+        EXTRA_KINDS.reduce(function (n, k) { return n + EXTRA[k].length; }, 0);
+    }
   };
 })();

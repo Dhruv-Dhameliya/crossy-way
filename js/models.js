@@ -828,11 +828,40 @@ var Models = (function () {
     return g;
   }
 
+  // ---------------------------------------------------------------------
+  // Supply crate: a wooden box with a gold coin on it, hanging under a striped parachute
+  // (userData.chute so the world can hide it after the landing)
+  // ---------------------------------------------------------------------
+  function buildCrate() {
+    var box = cachedMesh('crate:box', function () {
+      var o = [B(0, 0.26, 0, 0.5, 0.5, 0.5, 0xc08a50), B(0, 0.02, 0, 0.54, 0.06, 0.54, 0x8a5a2b), B(0, 0.5, 0, 0.54, 0.06, 0.54, 0x8a5a2b)];
+      [-1, 1].forEach(function (s2) {
+        o.push(B(s2 * 0.18, 0.26, 0, 0.07, 0.5, 0.52, 0x8a5a2b));
+        o.push(B(0, 0.26, s2 * 0.18, 0.52, 0.5, 0.07, 0x8a5a2b));
+      });
+      o.push(B(0, 0.26, 0.275, 0.22, 0.22, 0.02, CONFIG.COLORS.coin));
+      o.push(B(0, 0.26, -0.275, 0.22, 0.22, 0.02, CONFIG.COLORS.coin));
+      return o;
+    });
+    var chute = cachedMesh('crate:chute', function () {
+      var o = [B(0, 1.5, 0, 0.5, 0.1, 0.5, 0xff5a5f), B(0, 1.4, 0, 0.82, 0.1, 0.82, 0xffffff), B(0, 1.3, 0, 1.14, 0.1, 1.14, 0xff5a5f)];
+      [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(function (c) { o.push(B(c[0] * 0.2, 0.92, c[1] * 0.2, 0.02, 0.74, 0.02, 0xe6e6e6)); });
+      return o;
+    });
+    chute.castShadow = false;
+    var g = new THREE.Group();
+    g.add(box);
+    g.add(chute);
+    g.userData.chute = chute;
+    return g;
+  }
+
   // One of everything (including every special material), so the renderer can
   // compile every shader up front instead of hitching the first time one appears.
   function buildWarmGroup() {
     var g = new THREE.Group();
     g.add(buildCoin());
+    g.add(buildCrate());
     g.add(buildSignal().group);
     g.add(buildPad(true));
     Object.keys(BIOMES).forEach(function (k) { if (BIOMES[k].warm) g.add(BIOMES[k].warm()); });
@@ -1076,6 +1105,7 @@ var Models = (function () {
     buildTrainCar: buildTrainCar,
     buildSignal: buildSignal,
     buildCoin: buildCoin,
+    buildCrate: buildCrate,
     buildPowerup: buildPowerup,
     buildWarmGroup: buildWarmGroup,
     setNight: setNight,

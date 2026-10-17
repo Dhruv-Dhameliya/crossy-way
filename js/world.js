@@ -3,7 +3,8 @@
 // biome. The Forest is handled right here; any other biome only plugs in through
 // the optional hooks of its theme (Biome.theme(row.biome), see config.js), so this
 // file never mentions a particular biome. Extra hazards: sliding
-// ice lanes, crocodile logs and moving platforms over a chasm.
+// ice lanes, crocodile logs and moving platforms over a chasm. Grass lanes can also be
+// sticky mud, a sideways conveyor belt or a trampoline lane (see nextBand).
 function World(scene) {
   this.scene = scene;
   this.rows = new Map(); // z -> row data
@@ -42,7 +43,16 @@ World.prototype.nextBand = function (z) {
       { value: 1, weight: 0.38 }, { value: 2, weight: 0.34 }, { value: 3, weight: 0.2 }, { value: 4, weight: 0.08 }
     ]) };
     // slippery ice patch: needs a couple of rows to be worth sliding on
-    band.ice = z > 12 && band.left >= 2 && Math.random() < 0.17 * Difficulty.cur.special;
+    var sp0 = Difficulty.cur.special;
+    band.ice = z > 12 && band.left >= 2 && Math.random() < 0.17 * sp0;
+    if (!band.ice && Mutators.has('ice')) band.ice = Math.random() < 0.8;   // the Slip & Slide modifier
+    if (!band.ice) {
+      // one more lane twist at most: sticky mud (needs room), a conveyor belt, or a trampoline lane
+      var r2 = Math.random(), pMud = 0.14 * sp0, pBelt = 0.09 * sp0, pBounce = 0.07 * sp0;
+      if (z > 10 && band.left >= 2 && r2 < pMud) band.mud = true;
+      else if (z > 16 && r2 >= pMud && r2 < pMud + pBelt) { band.belt = true; band.left = Math.min(band.left, 2); band.beltDir = 0; }
+      else if (z > 22 && r2 >= pMud + pBelt && r2 < pMud + pBelt + pBounce) { band.bounce = true; band.left = Math.min(band.left, 2); }
+    }
   } else {
     var options = [
       { value: T.ROAD, weight: 0.5 },
@@ -132,7 +142,14 @@ World.prototype.generateRow = function (z) {
 
   var top = CONFIG.ROW_TOP[type];
   var biome = Biome.forRow(z);
-  var variant = type === T.GRASS && band.ice ? 'ice' : type === T.WATER && band.voidLane ? 'void' : undefined;
+  var beltDir = 0;
+  if (type === T.GRASS && band.belt) {                  // neighbouring belt rows run in opposite directions
+    beltDir = band.beltDir ? -band.beltDir : (Math.random() < 0.5 ? 1 : -1);
+    band.beltDir = beltDir;
+  }
+  var variant = type === T.GRASS
+    ? (band.ice ? 'ice' : band.mud ? 'mud' : band.belt ? (beltDir > 0 ? 'beltR' : 'beltL') : band.bounce ? 'bounce' : undefined)
+    : type === T.WATER && band.voidLane ? 'void' : undefined;
   var ground = new THREE.Mesh(Textures.getGroundGeometry(type), Textures.getGroundMaterials(type, parity, edge, biome, variant));
   ground.position.y = (top + CONFIG.ROW_BOTTOM) / 2;
   ground.receiveShadow = true;
@@ -141,6 +158,7 @@ World.prototype.generateRow = function (z) {
   var row = {
     z: z, type: type, top: top, group: group, blocked: {}, small: {}, vehicles: [], logs: [], coins: [], items: [], train: null,
     biome: biome, ice: variant === 'ice', void: variant === 'void',
+    mud: variant === 'mud', belt: beltDir, bounce: variant === 'bounce', jam: 0, crates: [],
     bikes: type === T.ROAD && !!band.bikes, stampede: type === T.ROAD && !!band.stampede
   };
   if (z > 0 && Biome.mode === 'auto' && Biome.forRow(z - 1) !== biome) {
@@ -153,7 +171,10 @@ World.prototype.generateRow = function (z) {
   var dir = band.dir || 1;
   if (type !== T.GRASS && type !== T.RAIL) band.dir = Math.random() < 0.85 ? -dir : dir;
 
-  if (type === T.GRASS) this.populateGrass(row, z, p);
+  if (type === T.GRASS) {
+    this.populateGrass(row, z, p, variant);
+    if (variant === 'bounce') this.decorateBounce(row);
+  }
   else if (type === T.ROAD) this.populateRoad(row, dir, p);
   else if (type === T.WATER) this.populateWater(row, dir, p, band);
   else {
@@ -172,13 +193,14 @@ World.prototype.generateRow = function (z) {
 // Grass: forest border, trees / rocks / bushes, coins. A "path column" that is
 // never blocked is carried upward so every grass row can always be crossed.
 // ---------------------------------------------------------------------------
-World.prototype.populateGrass = function (row, z, p) {
+World.prototype.populateGrass = function (row, z, p, variant) {
   var PH = CONFIG.PLAY_HALF;
   var forbid = {};
+  var open = variant === 'beltL' || variant === 'beltR' || variant === 'bounce';   // belts and trampolines have nothing to climb over
   if (z <= 0) {
     this.pathCol = 0;
     if (z === 0) forbid[0] = true;
-  } else {
+  } else if (!open) {
     var from = this.pathCol, to = from;
     if (Math.random() < 0.5) to = Utils.clamp(from + Utils.randInt(-3, 3), -(PH - 1), PH - 1);
     for (var c = Math.min(from, to); c <= Math.max(from, to); c++) forbid[c] = true;
@@ -186,7 +208,8 @@ World.prototype.populateGrass = function (row, z, p) {
   }
 
   var density;
-  if (z <= -3) density = 1;
+  if (open) density = 0;
+  else if (z <= -3) density = 1;
   else if (z < 0) density = 0.35;
   else if (z === 0) density = 0.1;
   else density = Utils.lerp(0.12, 0.2, p);
@@ -194,6 +217,7 @@ World.prototype.populateGrass = function (row, z, p) {
   var boxes = [];
   var x;
   for (x = -PH; x <= PH; x++) {
+    if (open) continue;
     if (forbid[x]) {
       if (Math.random() < 0.06) Models.flowerBoxes(boxes, x, 0, row.biome);
       continue;
@@ -243,7 +267,28 @@ World.prototype.placeCoinTrail = function (row) {
   }
 };
 
+// A trampoline lane: a few springy domes (nothing blocks the way) so it reads as bouncy.
+World.prototype.decorateBounce = function (row) {
+  var B = Models.helpers.B, C = Biome.colors(row.biome), boxes = [];
+  var cap = C.bounceRing !== undefined ? C.bounceRing : CONFIG.BIOME_COLORS.forest.bounceRing;
+  var rim = C.bounceSide !== undefined ? C.bounceSide : CONFIG.BIOME_COLORS.forest.bounceSide;
+  var used = {};
+  for (var i = 0; i < 3; i++) {
+    var x = Utils.randInt(-CONFIG.PLAY_HALF, CONFIG.PLAY_HALF);
+    if (used[x]) continue;
+    used[x] = true;
+    boxes.push(B(x, 0.03, 0, 0.62, 0.06, 0.62, rim));
+    boxes.push(B(x, 0.075, 0, 0.44, 0.05, 0.44, cap));
+  }
+  if (boxes.length) {
+    var m = Utils.voxelMesh(boxes, { castShadow: false });
+    m.position.y = row.top;
+    row.group.add(m);
+  }
+};
+
 World.prototype.addCoin = function (row, x) {
+  if (Mutators.has('noCoins')) return;
   for (var i = 0; i < row.coins.length; i++) if (!row.coins[i].collected && row.coins[i].x === x) return;   // one coin per tile
   var coin = Models.buildCoin();
   coin.position.set(x, row.top, 0);
@@ -372,7 +417,7 @@ World.prototype.attachVehicleMesh = function (row, v) {
 
 World.prototype.laneStep = function (row, dt) {
   var vs = row.vehicles, dir = row.dir, L = row.laneLen, wrap = CONFIG.LANE_HALF;
-  var frozen = this.frozen && row.live;
+  var frozen = (this.frozen || row.jam > 0) && row.live;   // Time Freeze, or a traffic jam on this lane
   var k = 1 - Math.exp(-dt * 10);
   for (var i = vs.length - 1; i >= 0; i--) {
     var v = vs[i];
@@ -430,8 +475,87 @@ var HORN_CHANCE = { truck: 0.6, bus: 0.5, taxi: 0.5, police: 0.3, van: 0.25, sed
 var SPECIAL_SOUND = { ambulance: 'siren', icecream: 'jingle', bicycle: 'bikeBell', herd: 'stomp' }; // signature sounds
 
 World.prototype.updateRoad = function (row, dt) {
+  if (row.jam > 0) { row.jam -= dt; this.jamHonks(row, dt); }
   this.laneStep(row, dt);
   this.vehicleAudio(row);
+};
+
+// Rare event: a traffic jam. The nearest busy road ahead (and the road lanes next to it) grinds
+// to a halt for a few seconds and everyone leans on the horn. Returns how many lanes jammed.
+World.prototype.startJam = function (pz) {
+  var T = CONFIG.ROW_TYPES, found = null, z, row;
+  for (z = pz + 2; z <= pz + 10 && !found; z++) {
+    row = this.rows.get(z);
+    if (row && row.type === T.ROAD && row.live && row.vehicles.length >= 2 && !row.stampede && !row.jam) found = row;
+  }
+  if (!found) return 0;
+  var n = 0, dur = 6.5 * (Difficulty.mode === 'zen' ? 1.4 : 1);
+  [-1, 1].forEach(function (dir) {
+    for (var zz = found.z + (dir > 0 ? 0 : -1); ; zz += dir) {
+      var r = this.rows.get(zz);
+      if (!r || r.type !== T.ROAD || r.stampede || r.jam) break;
+      r.jam = dur; r.honkT = Utils.randRange(0, 0.5); n++;
+      if (dir < 0 && zz < found.z - 3) break;
+      if (dir > 0 && zz > found.z + 3) break;
+    }
+  }, this);
+  return n;
+};
+
+// The honking of a jammed lane (louder the closer it is to the chicken).
+World.prototype.jamHonks = function (row, dt) {
+  var ls = this.listener;
+  if (!ls || !GameAudio) return;
+  var rel = Math.abs(row.z - ls.z);
+  if (rel > 9) return;
+  if ((row.honkT -= dt) > 0) return;
+  row.honkT = Utils.randRange(0.3, 0.8);
+  var near = row.vehicles.filter(function (v) { return Math.abs(v.x - ls.x) < 12; });
+  if (!near.length) return;
+  var v = Utils.choice(near);
+  GameAudio.carHorn(Utils.clamp(0.95 - rel * 0.09, 0.2, 0.95), v.kind === 'truck' || v.kind === 'bus' || v.kind === 'tractor');
+  Particles.puff(v.x - row.dir * (v.halfWidth + 0.2), row.top + 0.2, row.z, [0x9aa0a8, 0x7d838c]);   // a puff of exhaust
+};
+
+// ---------------------------------------------------------------------------
+// Supply crates: a drone (see events.js) drops one on a grass lane ahead. It floats down on a
+// parachute and can be picked up like a coin once it has landed.
+// ---------------------------------------------------------------------------
+World.prototype.pickCrateSpot = function (pz) {
+  var T = CONFIG.ROW_TYPES, tries = 0;
+  while (tries++ < 24) {
+    var z = pz + Utils.randInt(3, 8), row = this.rows.get(z);
+    if (!row || row.type !== T.GRASS) continue;
+    var x = Utils.randInt(-CONFIG.PLAY_HALF + 1, CONFIG.PLAY_HALF - 1);
+    if (row.blocked[x]) continue;
+    return { x: x, z: z };
+  }
+  return null;
+};
+
+World.prototype.dropCrate = function (z, x, height) {
+  var row = this.rows.get(z);
+  if (!row || row.type !== CONFIG.ROW_TYPES.GRASS || row.blocked[x]) return false;
+  var mesh = Models.buildCrate();
+  mesh.position.set(x, row.top + height, 0);
+  row.group.add(mesh);
+  row.crates.push({ x: x, mesh: mesh, fall: height, collected: false, phase: Math.random() * 6 });
+  return true;
+};
+
+World.prototype.tryCollectCrate = function (x, z) {
+  var row = this.rows.get(z);
+  if (!row) return null;
+  for (var i = 0; i < row.crates.length; i++) {
+    var c = row.crates[i];
+    if (!c.collected && !c.fall && Math.round(x) === c.x) {
+      c.collected = true;
+      row.group.remove(c.mesh);
+      Utils.disposeObject3D(c.mesh);
+      return c;
+    }
+  }
+  return null;
 };
 
 // Horns as a vehicle bears down on the chicken, and a whoosh as it passes.
@@ -729,6 +853,24 @@ World.prototype.update = function (dt, centerZ, playerZ, budget) {
       it.mesh.userData.ring.scale.setScalar(1 + (bob * 0.5 + 0.5) * 0.35);
     }
 
+    for (i = 0; i < row.crates.length; i++) {
+      var cr = row.crates[i];
+      if (cr.collected) continue;
+      if (cr.fall > 0) {                      // floating down on the parachute
+        cr.fall = Math.max(0, cr.fall - 2.4 * dt);
+        cr.mesh.position.y = row.top + cr.fall;
+        cr.mesh.rotation.z = Math.sin(time * 3 + cr.phase) * 0.12;
+        if (cr.fall <= 0) {
+          cr.mesh.rotation.z = 0;
+          cr.mesh.userData.chute.visible = false;
+          Particles.puff(cr.x, row.top + 0.05, row.z, [0xe8f5d8, 0xffffff]);
+          if (GameAudio && Math.abs(row.z - playerZ) < 8) GameAudio.crateLand();
+        }
+      } else {
+        cr.mesh.position.y = row.top + Math.abs(Math.sin(time * 2.6 + cr.phase)) * 0.05;
+      }
+    }
+
     if (row.type === T.ROAD) {
       self.updateRoad(row, dt);
     } else if (row.type === T.WATER) {
@@ -854,6 +996,7 @@ World.prototype.isIce = function (x, z) {
 // Coin rain: a shower of coins falls on the rows ahead. Returns how many.
 World.prototype.coinRain = function (z0) {
   var PH = CONFIG.PLAY_HALF, n = 0;
+  if (Mutators.has('noCoins')) return 0;
   for (var z = z0 + 1; z <= z0 + 9; z++) {
     var row = this.rows.get(z);
     if (!row || row.type === CONFIG.ROW_TYPES.WATER) continue;
@@ -1060,6 +1203,7 @@ World.prototype.isWater = function (z) {
 World.prototype.surfaceY = function (x, z) {
   var row = this.rows.get(z);
   if (!row) return 0;
+  if (row.mud) return row.top - 0.07;     // you sink into the mud a little
   if (row.type === CONFIG.ROW_TYPES.WATER) {
     var l = this.getLogAt(x, z);
     return l ? l.top : row.top;

@@ -91,6 +91,7 @@
         <button id="modeBtn" class="menu-btn mode" data-mode="medium" title="Change difficulty">⚡ MEDIUM</button>
       </div>
       <div class="home-bar">
+        <button id="mutBtn" class="menu-btn mutator" title="Pick a rule twist for your next run"><span class="mi">🎲</span> MODIFIERS</button>
         <button id="infoBtn" class="menu-btn info icon" title="How to play" aria-label="How to play">ℹ️</button>
         <button id="settingsBtn" class="menu-btn settings icon" title="Settings (Esc)" aria-label="Settings">⚙️</button>
         <button id="fullscreenBtn" class="menu-btn full icon" title="Fullscreen" aria-label="Fullscreen">⛶</button>
@@ -153,13 +154,28 @@
       <div class="tabs">
         <button class="tab shop-tab active" data-tab="skin">🐔 Chickens</button>
         <button class="tab shop-tab" data-tab="outfit">🎩 Outfits</button>
+        <button class="tab shop-tab" data-tab="pet">🐥 Pets</button>
         <button class="tab shop-tab" data-tab="fx">✨ Effects</button>
+        <button class="tab shop-tab" data-tab="trail">🐾 Trails</button>
+        <button class="tab shop-tab" data-tab="aura">🧲 Auras</button>
+        <button class="tab shop-tab" data-tab="death">💨 Exits</button>
+        <button class="tab shop-tab" data-tab="hsound">🔊 Sounds</button>
       </div>
       <button id="chestBtn" class="chest-btn"><span class="chest-ico">🎁</span><span class="chest-txt"><b>MYSTERY CHEST</b><small>A random new item</small></span><span class="chest-price">🪙 90</span></button>
       <div id="shopGrid" class="shop-grid"></div>
       <div id="chestReveal" class="chest-reveal hidden" aria-live="polite"></div>
       <p id="shopHint" class="shop-hint">Tap an item to buy or wear it.</p>
       <button id="closeShopBtn" class="close-btn">◀ BACK</button>
+    </div>
+  </div>
+
+  <!-- ===== RUN MODIFIERS ===== -->
+  <div id="mutPanel" class="panel modal hidden" role="dialog" aria-modal="true">
+    <div class="set-card mut-card-wrap">
+      <h2>MODIFIERS</h2>
+      <p class="setting-note">Pick one rule twist for your next run. Each modifier keeps its own top score (per difficulty).</p>
+      <div id="mutBody" class="mut-list"></div>
+      <button id="closeMutBtn" class="close-btn">◀ BACK</button>
     </div>
   </div>
 
@@ -175,9 +191,16 @@
   <!-- ===== TROPHIES ===== -->
   <div id="trophiesPanel" class="panel modal hidden" role="dialog" aria-modal="true">
     <div class="set-card trophy-card">
-      <h2>TROPHIES</h2>
-      <div class="trophy-head"><b id="trophyCount">0 / 0</b><div class="mbar"><i id="trophyBar" style="width:0%"></i></div></div>
-      <div id="trophiesBody"></div>
+      <h2 id="ttTitle">TROPHIES</h2>
+      <div class="tabs two">
+        <button class="tab tt-tab active" data-pane="trophies">🏆 Trophies</button>
+        <button class="tab tt-tab" data-pane="stats">📊 Stats</button>
+      </div>
+      <div id="trophyPane">
+        <div class="trophy-head"><b id="trophyCount">0 / 0</b><div class="mbar"><i id="trophyBar" style="width:0%"></i></div></div>
+        <div id="trophiesBody"></div>
+      </div>
+      <div id="statsPane" class="hidden"><div id="statsBody"></div></div>
       <button id="closeTrophiesBtn" class="close-btn">◀ BACK</button>
     </div>
   </div>
@@ -213,8 +236,15 @@
         <li>🚲 <b>Bike lanes:</b> small, fast bicycles (hover scooters in Space) come in streams. Listen for their bells.</li>
         <li>🚆 <b>Double tracks:</b> two railways can fire at once from opposite directions.</li>
         <li>🪵 <b>Rotten logs:</b> they shake, then sink. Keep moving!</li>
+        <li>⏩ <b>Conveyor lanes:</b> the belt carries you sideways while you stand on it. Hop on and keep moving.</li>
+        <li>🟤 <b>Mud lanes</b> (moon dust in Space): a hop that starts in the mud is slow and low.</li>
+        <li>🍄 <b>Trampoline lanes</b> (jump pads in Space): land on one and you are flung <b>two rows forward</b>, over anything. Make sure the landing is safe!</li>
         <li>🦬 <b>Stampede:</b> a rare lane of running animals. You get a rumble and a warning first.</li>
-        <li>⚡ <b>Rare events:</b> thunderstorms (solar flares in Space) and coin rain. Grab the coins!</li>
+        <li>⚡ <b>Rare events:</b> thunderstorms (solar flares in Space), coin rain, a <b>drone</b> that drops a supply crate on a grass lane, a <b>traffic jam</b> (a road stops and honks: your chance to cross) and <b>fireworks</b> (a short combo boost).</li>
+        <li>📅 <b>Weekly challenge:</b> one harder goal per week (Monday to Sunday), some tied to a modifier, with a bigger reward and a week streak. It sits under the daily challenge on the Missions screen.</li>
+        <li>📊 <b>Stats:</b> open <b>Trophies</b> and switch to the Stats tab to see your distance, time played, favourite way to lose and more.</li>
+        <li>🎲 <b>Modifiers:</b> pick a rule twist (Night Shift, Rush Hour, Penniless, Moon Hops...) on the home screen. Each one has its own top score.</li>
+        <li>🐥 <b>Shop extras:</b> pets that follow you, trails, auras, new ways to exit and hop sounds. All just for fun.</li>
         <li>🧘 <b>Zen mode:</b> no eagle, no timer, lots of coins. Pick it as your difficulty.</li>
         <li>🪨 <b>Chasms:</b> only moving platforms cross them. Time your hop, don't fall in.</li>
         <li>🚀 <b>Space:</b> run far enough and the world turns into space. Ships fly past steel walkways, rivers are empty space crossed on broken asteroids, comets replace trains (watch the beacons!), laser strikes replace crocodiles and a UFO replaces the eagle. Choose the stage on the home screen.</li>
@@ -377,15 +407,20 @@
   <script src="js/utils.js"></script>
   <script src="js/sounds.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/mutators.js"></script>
   <script src="js/cosmetics.js"></script>
   <script src="js/missions.js"></script>
   <script src="js/achievements.js"></script>
+  <script src="js/stats.js"></script>
   <script src="js/music.js"></script>
   <script src="js/weather.js"></script>
   <script src="js/textures.js"></script>
   <script src="js/models.js"></script>
   <script src="js/particles.js"></script>
   <script src="js/world.js"></script>
+  <script src="js/pets.js"></script>
+  <script src="js/flair.js"></script>
+  <script src="js/events.js"></script>
   <script src="js/player.js"></script>
   <!-- Space biome (self-contained: remove these lines and css/space.css and the game is just the Forest) -->
   <script src="js/space/audio.js"></script>
